@@ -184,6 +184,10 @@ static void tx_notify(struct bt_conn *conn)
 		/* Free up TX notify since there may be user waiting */
 		tx_free(tx);
 
+		if (cb == NULL) {
+			break;
+		}
+
 		/* Run the callback, at this point it should be safe to
 		 * allocate new buffers since the TX should have been
 		 * unblocked by tx_free.
