@@ -1685,16 +1685,17 @@ void ull_conn_tx_ack(uint16_t handle, memq_link_t *link, struct node_tx *tx)
 		}
 
 		/* release ctrl mem if points to itself */
-		if (link->next == (void *)tx) {
-			LL_ASSERT(link->next);
+		if (tx) {
+			/* release ctrl mem if points to itself */
+			if (link->next == (void *)tx) {
+				LL_ASSERT(link->next);
 
-			mem_release(tx, &mem_conn_tx_ctrl.free);
-			return;
-		} else if (!tx) {
+				mem_release(tx, &mem_conn_tx_ctrl.free);
+				return;
+			}
+		} else {
 			/* Tx Node re-used to enqueue new ctrl PDU */
 			return;
-		} else {
-			//LL_ASSERT(!link->next);
 		}
 	} else if (handle == LLL_HANDLE_INVALID) {
 		pdu_tx->ll_id = PDU_DATA_LLID_RESV;
