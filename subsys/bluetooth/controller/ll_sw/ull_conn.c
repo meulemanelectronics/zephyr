@@ -1577,7 +1577,7 @@ void ull_conn_tx_lll_enqueue(struct ll_conn *conn, uint8_t count)
 {
 	bool pause_tx = false;
 
-	while (conn->tx_head &&
+	while (conn && conn->tx_head &&
 	       ((
 #if defined(CONFIG_BT_CTLR_PHY)
 		 !conn->llcp_phy.pause_tx &&

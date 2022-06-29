@@ -203,7 +203,7 @@ static inline void sys_slist_init(sys_slist_t *list)
 
 static inline sys_snode_t *z_snode_next_peek(sys_snode_t *node)
 {
-	return node->next;
+	return node ? node->next : NULL;
 }
 
 static inline void z_snode_next_set(sys_snode_t *parent, sys_snode_t *child)

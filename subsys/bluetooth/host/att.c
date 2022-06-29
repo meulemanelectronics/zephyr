@@ -598,6 +598,10 @@ static void att_req_send_process(struct bt_att *att)
 static uint8_t att_handle_rsp(struct bt_att_chan *chan, void *pdu, uint16_t len,
 			   uint8_t err)
 {
+	if (!chan || !pdu) { 
+	       return 0; 
+	}
+
 	bt_att_func_t func = NULL;
 	void *params;
 
@@ -629,8 +633,11 @@ static uint8_t att_handle_rsp(struct bt_att_chan *chan, void *pdu, uint16_t len,
 
 process:
 	/* Process pending requests */
-	att_req_send_process(chan->att);
-	if (func) {
+	if (chan && chan->att) { 
+		att_req_send_process(chan->att);
+	}
+
+	if (chan && chan->att && chan->att->conn && func) {
 		func(chan->att->conn, err, pdu, len, params);
 	}
 

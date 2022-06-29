@@ -3021,7 +3021,7 @@ static void gatt_find_type_rsp(struct bt_conn *conn, uint8_t err,
 							      &value);
 		attr.handle = start_handle;
 
-		if (params->func(conn, &attr, params) == BT_GATT_ITER_STOP) {
+		if ( (params && !params->func) || (params && params->func && params->func(conn, &attr, params) == BT_GATT_ITER_STOP)) {
 			return;
 		}
 	}
@@ -3718,7 +3718,9 @@ static void gatt_find_info_rsp(struct bt_conn *conn, uint8_t err,
 	return;
 
 done:
-	params->func(conn, NULL, params);
+	if (params && params->func && conn && params) {
+        	params->func(conn, NULL, params);
+	}
 }
 
 static int gatt_find_info_encode(struct net_buf *buf, size_t len,
