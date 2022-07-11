@@ -9,9 +9,6 @@
 #include <logging/log.h>
 LOG_MODULE_REGISTER(modem_quectel_bg9x, CONFIG_MODEM_LOG_LEVEL);
 
-#include <devicetree.h>
-#include <drivers/i2c.h>
-
 #include "quectel-bg9x.h"
 
 static struct k_thread	       modem_rx_thread;
@@ -19,9 +16,6 @@ static struct k_work_q	       modem_workq;
 static struct modem_data       mdata;
 static struct modem_context    mctx;
 static const struct socket_op_vtable offload_socket_fd_op_vtable;
-
-#define IO_EXPANDER_NODE        DT_NODELABEL(pi4ioe5v9)
-#define IO_EXPANDER_BUS_LABEL   DT_BUS_LABEL(IO_EXPANDER_NODE)
 
 static K_KERNEL_STACK_DEFINE(modem_rx_stack, CONFIG_MODEM_QUECTEL_BG9X_RX_STACK_SIZE);
 static K_KERNEL_STACK_DEFINE(modem_workq_stack, CONFIG_MODEM_QUECTEL_BG9X_RX_WORKQ_STACK_SIZE);
@@ -900,6 +894,7 @@ static void pin_init(void)
 	k_sleep(K_MSEC(250));
 #endif
 
+#if defined(BG95_MODEM)
 	modem_pin_write(&mctx, MDM_RESET, 1);
 	modem_pin_write(&mctx, MDM_POWER, 1);
 	k_sleep(K_SECONDS(1));
@@ -915,6 +910,21 @@ static void pin_init(void)
 	modem_pin_write(&mctx, MDM_RESET, 0);
 	modem_pin_write(&mctx, MDM_POWER, 0);
 	k_sleep(K_SECONDS(2));
+#else
+        /* NOTE: Per the BG95 document, the Reset pin is internally connected to the
+	 * Power key pin.
+	 */
+
+	/* MDM_POWER -> 1 for 500-1000 msec. */
+	modem_pin_write(&mctx, MDM_POWER, 1);
+	k_sleep(K_MSEC(750));
+
+	/* MDM_POWER -> 0 and wait for ~2secs as UART remains in "inactive" state
+	 * for some time after the power signal is enabled.
+	 */
+	modem_pin_write(&mctx, MDM_POWER, 0);
+	k_sleep(K_SECONDS(2));
+#endif
 
 	LOG_INF("... Done!");
 }
@@ -1195,29 +1205,6 @@ static int modem_init(const struct device *dev)
 			K_KERNEL_STACK_SIZEOF(modem_rx_stack),
 			(k_thread_entry_t) modem_rx,
 			NULL, NULL, NULL, K_PRIO_COOP(7), 0, K_NO_WAIT);
-
-
-        /* power on modem */
-        // Enable the battery voltage pin (VLTE-ENB)
-        uint8_t pinPosition = 1 + (8 * 1); // VLTE-ENB is pin 9 on the GPIO expander.
-        uint16_t vLteEnb = 0u;
-        vLteEnb &= ~(1u << pinPosition);
-        vLteEnb |= (1u << pinPosition);
-        uint8_t data[2] = { (uint8_t)(0x00ff & vLteEnb), (uint8_t)((0xff00 & vLteEnb) >> 8) };
-        const struct device *i2cDevice = device_get_binding(IO_EXPANDER_BUS_LABEL);
-        ret = i2c_burst_write(i2cDevice, 0x24, 0x02, &data[0], sizeof(data));
-
-        // Enable the regular power pin (VLTE-EN)
-        const struct device *gpio_dev = device_get_binding("GPIO_1");
-        const struct gpio_dt_spec vLteEn = {
-                .port = gpio_dev,
-                .pin = 12,
-                .dt_flags = GPIO_ACTIVE_HIGH
-        };
-
-        ret = gpio_pin_set_dt(&vLteEn, 1);
-        k_sleep(K_SECONDS(2));
-
 
 	/* Init RSSI query */
 	k_work_init_delayable(&mdata.rssi_query_work, modem_rssi_query_work);
