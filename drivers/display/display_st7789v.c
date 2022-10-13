@@ -93,6 +93,25 @@ static void st7789v_transmit(const struct device *dev, uint8_t cmd,
 	}
 }
 
+static void st7789v_receive(const struct device *dev, uint8_t cmd,
+			     uint8_t *rx_data, size_t rx_count)
+{
+	const struct st7789v_config *config = dev->config;
+
+	struct spi_buf buf = { .buf = &cmd, .len = 1 };
+	struct spi_buf_set bufs = { .buffers = &buf, .count = 1 };
+
+	st7789v_set_cmd(dev, 1);
+	spi_write_dt(&config->bus, &bufs);
+
+	if (rx_data != NULL) {
+		buf.buf = rx_data;
+		buf.len = rx_count;
+		st7789v_set_cmd(dev, 0);
+		spi_read_dt(&config->bus, &bufs);
+	}
+}
+
 static void st7789v_exit_sleep(const struct device *dev)
 {
 	st7789v_transmit(dev, ST7789V_CMD_SLEEP_OUT, NULL, 0);
@@ -263,11 +282,23 @@ static int st7789v_set_orientation(const struct device *dev,
 	return -ENOTSUP;
 }
 
+static int st7789v_read_display_id(const struct device *dev)
+{
+	uint8_t display_id[4];
+	st7789v_receive(dev, ST7789V_CMD_READ_DISPLAY_ID,
+			 display_id, sizeof(display_id));
+
+	return	 (display_id[1] != 0x0 && display_id[1] != 0xFF) ||
+			 (display_id[2] != 0x0 && display_id[2] != 0xFF) ||
+			 (display_id[3] != 0x0 && display_id[3] != 0xFF);
+}
+
 static void st7789v_lcd_init(const struct device *dev)
 {
 	struct st7789v_data *data = dev->data;
 	const struct st7789v_config *config = dev->config;
 	uint8_t tmp;
+	uint8_t tmp2[2];
 
 	st7789v_set_lcd_margins(dev, data->x_offset,
 				data->y_offset);
@@ -295,8 +326,9 @@ static void st7789v_lcd_init(const struct device *dev)
 	st7789v_transmit(dev, ST7789V_CMD_VCOMS, &tmp, 1);
 
 	if (config->vdv_vrh_enable) {
-		tmp = 0x01;
-		st7789v_transmit(dev, ST7789V_CMD_VDVVRHEN, &tmp, 1);
+		tmp2[0] = 0x01;
+		tmp2[1] = 0xFF;
+		st7789v_transmit(dev, ST7789V_CMD_VDVVRHEN, tmp2, sizeof(tmp2));
 
 		tmp = config->vrh_value;
 		st7789v_transmit(dev, ST7789V_CMD_VRH, &tmp, 1);
@@ -315,6 +347,12 @@ static void st7789v_lcd_init(const struct device *dev)
 
 	/* Interface Pixel Format */
 	tmp = config->colmod;
+	tmp &= 0xF8;
+#ifdef CONFIG_ST7789V_RGB565
+	tmp |= 0x05;
+#else
+	tmp |= 0x07;
+#endif
 	st7789v_transmit(dev, ST7789V_CMD_COLMOD, &tmp, 1);
 
 	tmp = config->lcm;
@@ -374,6 +412,11 @@ static int st7789v_init(const struct device *dev)
 	}
 
 	st7789v_reset_display(dev);
+
+	if (!st7789v_read_display_id(dev)) {
+		LOG_ERR("Couldn't read display ID");
+		return -ENODEV;
+	}
 
 	st7789v_blanking_on(dev);
 
