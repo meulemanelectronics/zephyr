@@ -10,6 +10,7 @@
 LOG_MODULE_REGISTER(modem_quectel_bg9x, CONFIG_MODEM_LOG_LEVEL);
 
 #include "quectel-bg9x.h"
+#include <zephyr/drivers/modem/quectel-bg9x.h>
 #include <fcntl.h>
 
 static struct k_thread	       modem_rx_thread;
@@ -17,6 +18,7 @@ static struct k_work_q	       modem_workq;
 static struct modem_data       mdata;
 static struct modem_context    mctx;
 static const struct socket_op_vtable offload_socket_fd_op_vtable;
+static struct bg9x_gnss_data gnss_data;
 
 #if defined(CONFIG_DNS_RESOLVER)
 static struct zsock_addrinfo result;
@@ -968,7 +970,191 @@ static const struct setup_cmd setup_cmds[] = {
 	SETUP_CMD("AT+QCCID", "", on_cmd_atcmdinfo_iccid, 0U, ""),
 #endif /* #if defined(CONFIG_MODEM_SIM_NUMBERS) */
 	SETUP_CMD_NOHANDLE("AT+QICSGP=1,1,\"" MDM_APN "\",\"" MDM_USERNAME "\", \"" MDM_PASSWORD "\",1"),
+#ifdef CONFIG_MODEM_QUECTEL_BG9X_ENABLE_GNSS
+	SETUP_CMD_NOHANDLE("AT+QGPSCFG=\"outport\",\"" CONFIG_MODEM_QUECTEL_BG9X_GNSS_OUTPORT "\""),
+	SETUP_CMD_NOHANDLE("AT+QGPSCFG=\"gpsnmeatype\",31"),
+	SETUP_CMD_NOHANDLE("AT+QGPSCFG=\"glonassnmeatype\",7"),
+	SETUP_CMD_NOHANDLE("AT+QGPSCFG=\"galileonmeatype\",1"),
+	SETUP_CMD_NOHANDLE("AT+QGPSCFG=\"beidounmeatype\",3"),
+#endif
 };
+
+int mdm_bg9x_start_gnss(void)
+{
+	int ret = modem_cmd_send(&mctx.iface, &mctx.cmd_handler, NULL, 0U, "AT+QGPS=1",
+			     &mdata.sem_response, MDM_CMD_TIMEOUT);
+	if (ret < 0) {
+		return -1;
+	}
+
+	return 0;
+}
+
+int mdm_bg9x_stop_gnss(void)
+{
+	int ret = modem_cmd_send(&mctx.iface, &mctx.cmd_handler, NULL, 0U, "AT+QGPSEND",
+			     &mdata.sem_response, MDM_CMD_TIMEOUT);
+	if (ret < 0) {
+		return -1;
+	}
+
+	return 0;
+}
+
+/**
+ * Parses QGPSLOC response into the gnss_data structure.
+ *
+ * @param gps_buf Null terminated buffer containing the response.
+ * @return 0 on successful parse. Otherwise <0 is returned.
+ */
+static int parse_gnss_location(char *gps_buf)
+{
+	char *saveptr;
+	int ret;
+	int32_t number, fraction;
+
+	char *utctime = gnss_get_next_param(gps_buf, ",", &saveptr);
+
+	if (utctime == NULL) {
+		goto error;
+	}
+
+	char *lat = gnss_get_next_param(NULL, ",", &saveptr);
+
+	if (lat == NULL) {
+		goto error;
+	}
+
+	char *lon = gnss_get_next_param(NULL, ",", &saveptr);
+
+	if (lon == NULL) {
+		goto error;
+	}
+
+	char *hdop = gnss_get_next_param(NULL, ",", &saveptr);
+
+	if (hdop == NULL) {
+		goto error;
+	}
+
+	char *alt = gnss_get_next_param(NULL, ",", &saveptr);
+
+	if (alt == NULL) {
+		goto error;
+	}
+
+	/* discard positioning mode*/
+	gnss_skip_param(&saveptr);
+
+	char *course = gnss_get_next_param(NULL, ",", &saveptr);
+
+	if (course == NULL) {
+		goto error;
+	}
+
+	char *speed = gnss_get_next_param(NULL, ",", &saveptr);
+
+	if (speed == NULL) {
+		goto error;
+	}
+
+	/* discard speed in knots*/
+	gnss_skip_param(&saveptr);
+
+	char *utcdate = gnss_get_next_param(NULL, ",", &saveptr);
+
+	if (utcdate == NULL) {
+		goto error;
+	}
+
+	strncpy(gnss_data.utc, utcdate, sizeof(gnss_data.utc));
+	strncat(gnss_data.utc, utctime, sizeof(gnss_data.utc));
+
+	ret = gnss_split_on_dot(lat, &number, &fraction);
+	if (ret != 0) {
+		goto error;
+	}
+	gnss_data.lat = number * 100000 + fraction;
+
+	ret = gnss_split_on_dot(lon, &number, &fraction);
+	if (ret != 0) {
+		goto error;
+	}
+	gnss_data.lon = number * 100000 + fraction;
+
+	ret = gnss_split_on_dot(alt, &number, &fraction);
+	if (ret != 0) {
+		goto error;
+	}
+	gnss_data.alt = number * 1000 + fraction;
+
+	ret = gnss_split_on_dot(hdop, &number, &fraction);
+	if (ret != 0) {
+		goto error;
+	}
+	gnss_data.hdop = number * 10 + fraction;
+
+	ret = gnss_split_on_dot(course, &number, &fraction);
+	if (ret != 0) {
+		goto error;
+	}
+	gnss_data.cog = number * 100 + fraction * 10;
+
+	ret = gnss_split_on_dot(speed, &number, &fraction);
+	if (ret != 0) {
+		goto error;
+	}
+	gnss_data.kmh = number * 10 + fraction;
+
+	gnss_data.nsat = strtol(saveptr, NULL, 10);
+
+	return 0;
+
+error:
+	memset(&gnss_data, 0, sizeof(gnss_data));
+	return -1;
+}
+
+/*
+ * Parses the +QGPSLOC GNSS response.
+ *
+ * The QGPSLOC command has the following parameters:
+ *
+ *  +QGPSLOC: <UTC Time>,<Latitude>,<Longitude>,<HDOP>,
+ *            <Altitude>,<Fix>,<Course Over Ground km/h>,
+ *            <Speed Over Ground knots>,<UTC Date>,
+ *            <GNSS Satellites in View>
+ *
+ */
+MODEM_CMD_DEFINE(on_cmd_gnss_loc)
+{
+	char gps_buf[MDM_GNSS_PARSER_MAX_LEN];
+	size_t out_len = net_buf_linearize(gps_buf, sizeof(gps_buf) - 1,
+					   data->rx_buf, 0, len);
+
+	gps_buf[out_len] = '\0';
+
+	return parse_gnss_location(gps_buf);
+}
+
+int mdm_bg9x_query_gnss(struct bg9x_gnss_data *data)
+{
+	struct modem_cmd cmd = MODEM_CMD("+QGPSLOC: ", on_cmd_gnss_loc, 0U, NULL);
+	int ret = modem_cmd_send(&mctx.iface, &mctx.cmd_handler, &cmd, 1U, "AT+QGPSLOC=2",
+			     &mdata.sem_response, MDM_CMD_TIMEOUT);
+
+	if (ret < 0) {
+		return -EAGAIN;
+	}
+
+	if (data != NULL) {
+		memcpy(data, &gnss_data, sizeof(gnss_data));
+	}
+
+	memset(&gnss_data, 0, sizeof(gnss_data));
+
+	return 0;
+}
 
 /* Func: modem_pdp_context_active
  * Desc: This helper function is called from modem_setup, and is
