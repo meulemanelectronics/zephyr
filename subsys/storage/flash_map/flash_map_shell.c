@@ -25,7 +25,7 @@ static void fa_cb(const struct flash_area *fa, void *user_data)
 	struct shell *shell = user_data;
 
 	shell_print(shell, "%2d   0x%0*"PRIxPTR"   %-26s  0x%-10x 0x%-12x",
-		    (int)fa->fa_id, sizeof(uintptr_t) * 2, (uintptr_t)fa->fa_dev, fa->fa_dev->name,
+		    (int)fa->fa_id, sizeof(uintptr_t) * 2, (uintptr_t)fa->fa_dev, fa->fa_dev_name,
 		    (uint32_t) fa->fa_off, fa->fa_size);
 }
 

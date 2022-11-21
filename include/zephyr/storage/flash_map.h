@@ -63,6 +63,7 @@ struct flash_area {
 	size_t fa_size;
 	/** Backing flash device */
 	const struct device *fa_dev;
+	const char *fa_label;
 };
 
 /**
