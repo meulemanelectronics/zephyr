@@ -65,6 +65,7 @@ struct flash_area {
 	 * device_get_binding().
 	 */
 	const char *fa_dev_name;
+	const char *fa_label;
 };
 
 /**
