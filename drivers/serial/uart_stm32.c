@@ -1695,6 +1695,8 @@ static int uart_stm32_init(const struct device *dev)
 	}
 #endif
 
+	LL_USART_EnableFIFO(config->usart);
+
 	LL_USART_Enable(config->usart);
 
 #ifdef USART_ISR_TEACK
