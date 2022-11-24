@@ -1651,7 +1651,9 @@ static int uart_stm32_init(const struct device *dev)
 	}
 #endif
 
+#if defined(CONFIG_UART_STM32_FIFO_ENABLE)
 	LL_USART_EnableFIFO(config->usart);
+#endif /* CONFIG_UART_STM32_FIFO_ENABLE */
 
 	LL_USART_Enable(config->usart);
 
