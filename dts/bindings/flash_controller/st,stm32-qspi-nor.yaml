@@ -52,12 +52,15 @@ properties:
                  Now only value of 4 (when using SIO[0123]) is supported.
   writeoc:
     type: string
+    required: false
     enum:
-      - "PP_1_1_4"      # Quad data line SPI, PP 1-1-4 (0x32)
-      - "PP_1_4_4"      # Quad data line SPI, PP 1-4-4 (0x38)
+      - "MODE_111"      # Quad data line SPI, PP 1-1-1 (0x02)
+      - "MODE_114"      # Quad data line SPI, PP 1-1-4 (0x32)
+      - "MODE_144"      # Quad data line SPI, PP 1-4-4 (0x38)
     description: |
       The value encodes number of I/O lines used for the opcode,
       address, and data.
+
 
       There is no info about quad page program opcodes in the SFDP
       tables, hence it has been assumed that NOR flash memory
