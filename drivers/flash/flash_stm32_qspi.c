@@ -92,10 +92,11 @@ struct flash_stm32_qspi_data {
 	/* Number of bytes per page */
 	uint16_t page_size;
 	enum jesd216_dw15_qer_type qer_type;
+	enum jesd216_mode_type desired_mode;
 	enum jesd216_mode_type mode;
+	enum jesd216_mode_type qspi_write_mode;
 	int cmd_status;
 	struct stream dma;
-	uint8_t qspi_write_cmd;
 	uint8_t qspi_read_cmd;
 	uint8_t qspi_read_cmd_latency;
 	/*
@@ -155,14 +156,28 @@ static inline int qspi_prepare_quad_program(const struct device *dev,
 {
 	struct flash_stm32_qspi_data *dev_data = dev->data;
 
-	__ASSERT_NO_MSG(dev_data->qspi_write_cmd == SPI_NOR_CMD_PP_1_1_4 ||
-			dev_data->qspi_write_cmd == SPI_NOR_CMD_PP_1_4_4);
+	__ASSERT_NO_MSG(dev_data->qspi_write_mode == JESD216_MODE_111 ||
+			dev_data->qspi_write_mode == JESD216_MODE_114 ||
+			dev_data->qspi_write_mode == JESD216_MODE_144);
 
-	cmd->Instruction = dev_data->qspi_write_cmd;
-	cmd->AddressMode = ((cmd->Instruction == SPI_NOR_CMD_PP_1_1_4)
-				? QSPI_ADDRESS_1_LINE
-				: QSPI_ADDRESS_4_LINES);
-	cmd->DataMode = QSPI_DATA_4_LINES;
+	switch (dev_data->qspi_write_mode) {
+		case JESD216_MODE_111:
+			cmd->Instruction = SPI_NOR_CMD_PP;
+			cmd->AddressMode = QSPI_ADDRESS_1_LINE;
+			cmd->DataMode = QSPI_DATA_1_LINE;
+		case JESD216_MODE_114:
+			cmd->Instruction = SPI_NOR_CMD_PP_1_1_4;
+			cmd->AddressMode = QSPI_ADDRESS_1_LINE;
+			cmd->DataMode = QSPI_DATA_4_LINES;
+			break;
+		case JESD216_MODE_144:
+			cmd->Instruction = SPI_NOR_CMD_PP_1_4_4;
+			cmd->AddressMode = QSPI_ADDRESS_4_LINES;
+			cmd->DataMode = QSPI_DATA_4_LINES;
+			break;
+		default:
+			return -1;
+	}
 	cmd->DummyCycles = 0;
 
 	return 0;
@@ -976,16 +991,21 @@ static int spi_nor_process_bfp(const struct device *dev,
 	 * is supported - other modes are not.
 	 */
 	if (IS_ENABLED(STM32_QSPI_USE_QUAD_IO)) {
-		const enum jesd216_mode_type supported_modes[] = { JESD216_MODE_114,
-								   JESD216_MODE_144 };
+		enum jesd216_mode_type supported_modes[] = { JESD216_MODE_114,
+							 JESD216_MODE_144 };
+		int nr_of_modes = ARRAY_SIZE(supported_modes);
+		if (data->desired_mode != STM32_QSPI_UNKNOWN_MODE) {
+			supported_modes[0] = data->desired_mode;
+			nr_of_modes = 1;
+		}
 		struct jesd216_bfp_dw15 dw15;
 		struct jesd216_instr res;
 
 		/* reset active mode */
 		data->mode = STM32_QSPI_UNKNOWN_MODE;
 
-		/* query supported read modes, begin from the slowest */
-		for (size_t i = 0; i < ARRAY_SIZE(supported_modes); ++i) {
+		/* query supported read modes, either from the desired or begin from the slowest */
+		for (size_t i = 0; i < nr_of_modes; ++i) {
 			rc = jesd216_bfp_read_support(php, bfp, supported_modes[i], &res);
 			if (rc >= 0) {
 				LOG_INF("Quad read mode %d instr [0x%x] supported",
@@ -1270,7 +1290,12 @@ static void flash_stm32_qspi_irq_config_func(const struct device *dev);
 
 #define DT_WRITEOC_PROP_OR(inst, default_value)                                              \
 	COND_CODE_1(DT_INST_NODE_HAS_PROP(inst, writeoc),                                    \
-		    (_CONCAT(SPI_NOR_CMD_, DT_STRING_TOKEN(DT_DRV_INST(inst), writeoc))),    \
+		    (_CONCAT(JESD216_, DT_STRING_TOKEN(DT_DRV_INST(inst), writeoc))),    \
+		    ((default_value)))
+
+#define DT_READOC_PROP_OR(inst, default_value)                                              \
+	COND_CODE_1(DT_INST_NODE_HAS_PROP(inst, readoc),                                    \
+		    (_CONCAT(JESD216_, DT_STRING_TOKEN(DT_DRV_INST(inst), readoc))),         \
 		    ((default_value)))
 
 #define DT_QER_PROP_OR(inst, default_value)                                                  \
@@ -1309,7 +1334,8 @@ static struct flash_stm32_qspi_data flash_stm32_qspi_dev_data = {
 			},
 	},
 	.qer_type = DT_QER_PROP_OR(0, JESD216_DW15_QER_VAL_S1B6),
-	.qspi_write_cmd = DT_WRITEOC_PROP_OR(0, SPI_NOR_CMD_PP_1_4_4),
+	.qspi_write_mode = DT_WRITEOC_PROP_OR(0, JESD216_MODE_111),
+	.desired_mode = DT_READOC_PROP_OR(0, STM32_QSPI_UNKNOWN_MODE),
 	QSPI_DMA_CHANNEL(STM32_QSPI_NODE, tx_rx)
 };
 
