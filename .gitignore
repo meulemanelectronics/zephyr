@@ -16,6 +16,8 @@ build*/
 !scripts/pylib/build_helpers
 cscope.*
 .dir
+__pycache__
+manifest-tmp/
 
 /*.patch
 
