@@ -815,6 +815,19 @@ static int str_encode(const char **str, json_append_bytes_t append_bytes,
 	return ret;
 }
 
+static int null_encode(const char **str, json_append_bytes_t append_bytes,
+		      void *data)
+{
+	int ret;
+
+	ret = append_bytes("null", 4, data);
+	if (ret < 0) {
+		return ret;
+	}
+
+	return ret;
+}
+
 static int num_encode(const int32_t *num, json_append_bytes_t append_bytes,
 		      void *data)
 {
@@ -862,6 +875,8 @@ static int encode(const struct json_obj_descr *descr, const void *val,
 				       ptr, append_bytes, data);
 	case JSON_TOK_NUMBER:
 		return num_encode(ptr, append_bytes, data);
+	case JSON_TOK_NULL:
+		return null_encode(ptr, append_bytes, data);
 	default:
 		return -EINVAL;
 	}
