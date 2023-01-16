@@ -50,6 +50,13 @@ LOG_MODULE_REGISTER(modem_gsm, CONFIG_MODEM_LOG_LEVEL);
 	#define GSM_RSSI_MAXVAL         -51
 #endif
 
+const uint8_t disconnect_cmux[4][9] = {
+	{ 0xF9, 0x07, 0x53, 0x01, 0x3F, 0xF9, 0x00, 0x00, 0x00 },
+	{ 0xF9, 0x0B, 0x53, 0x01, 0xB8, 0xF9, 0x00, 0x00, 0x00 },
+	{ 0xF9, 0x0F, 0x53, 0x01, 0x7A, 0xF9, 0x00, 0x00, 0x00 },
+	{ 0xF9, 0x03, 0xEF, 0x05, 0xC3, 0x01, 0xF2, 0xF9, 0x00 },
+};
+
 /* Modem network registration state */
 enum network_state {
 	GSM_NET_INIT = -1,
@@ -1107,16 +1114,44 @@ void gsm_ppp_start(const struct device *dev)
 	(void)gsm_work_reschedule(&gsm->gsm_configure_work, K_NO_WAIT);
 }
 
-void gsm_ppp_stop(const struct device *dev)
+void gsm_ppp_cancel(struct gsm_modem *gsm)
 {
-	struct gsm_modem *gsm = dev->data;
-	struct net_if *iface = gsm->iface;
 	struct k_work_sync work_sync;
 
 	(void)k_work_cancel_delayable_sync(&gsm->gsm_configure_work, &work_sync);
 	if (IS_ENABLED(CONFIG_GSM_MUX)) {
 		(void)k_work_cancel_delayable_sync(&gsm->rssi_work_handle, &work_sync);
 	}
+}
+
+void gsm_ppp_recover_cmux(const struct device *dev)
+{
+	struct gsm_modem *gsm = dev->data;
+
+	gsm_ppp_cancel(gsm);
+
+	modem_cmd_handler_disable_eol(&gsm->context.cmd_handler);
+
+	int i;
+	for (i = 0; i < ARRAY_SIZE(disconnect_cmux); i++)
+	{
+		(void)modem_cmd_send_nolock(&gsm->context.iface,
+				    &gsm->context.cmd_handler,
+				    NULL, 0,
+				    disconnect_cmux[i], &gsm->sem_response,
+				    GSM_CMD_AT_TIMEOUT);
+		k_msleep(1);
+	}
+
+	modem_cmd_handler_restore_eol(&gsm->context.cmd_handler);
+}
+
+void gsm_ppp_stop(const struct device *dev)
+{
+	struct gsm_modem *gsm = dev->data;
+	struct net_if *iface = gsm->iface;
+
+	gsm_ppp_cancel(gsm);
 
 	net_if_l2(iface)->enable(iface, false);
 

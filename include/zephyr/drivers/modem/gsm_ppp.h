@@ -31,6 +31,7 @@ struct device;
 typedef void (*gsm_modem_power_cb)(const struct device *, void *);
 
 void gsm_ppp_start(const struct device *dev);
+void gsm_ppp_recover_cmux(const struct device *dev);
 void gsm_ppp_stop(const struct device *dev);
 /** @endcond */
 
