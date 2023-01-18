@@ -784,6 +784,7 @@ attaching:
 
 	LOG_DBG("modem attach returned %d, %s", ret, "read RSSI");
 	gsm->rssi_retries = GSM_RSSI_RETRIES;
+	gsm->minfo.mdm_rssi = GSM_RSSI_INVALID;
 
  attached:
 
@@ -806,7 +807,7 @@ attaching:
 #endif
 	}
 
-	LOG_DBG("modem RSSI: %d, %s", *gsm->context.data_rssi, "enable PPP");
+	LOG_DBG("modem RSSI: %d, %s", gsm->minfo.mdm_rssi, "enable PPP");
 
 	ret = modem_cmd_handler_setup_cmds_nolock(&gsm->context.iface,
 						  &gsm->context.cmd_handler,
@@ -845,8 +846,6 @@ attaching:
 			}
 		}
 		modem_cmd_handler_tx_unlock(&gsm->context.cmd_handler);
-		(void)gsm_work_reschedule(&gsm->rssi_work_handle,
-					  K_SECONDS(CONFIG_MODEM_GSM_RSSI_POLLING_PERIOD));
 	}
 }
 
