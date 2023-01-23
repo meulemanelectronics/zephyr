@@ -142,4 +142,12 @@ config GSM_PPP_WORKQ_PRIORITY
 	help
 	  Workqueue scheduling commands configuring the modem.
 
+config MODEM_GSM_ENABLE_GNSS
+	bool "GNSS support for GSM PPP driver"
+	select MODEM_GNSS_PARSER
+	depends on MODEM_GSM_QUECTEL
+	default n
+	help
+	  Enable GNSS support such that it provides the current location. Currently only
+	  BG9X is supported.
 endif

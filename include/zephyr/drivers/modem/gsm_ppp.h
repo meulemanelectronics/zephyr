@@ -21,6 +21,8 @@
 #define GSM_PPP_SMS_TIME_LENGTH          16
 #define GSM_PPP_SMS_DATA_LENGTH         180
 
+#define GSM_PPP_GNSS_DATA_UTC_LEN      	 64
+
 struct gsm_ppp_modem_info {
 	char mdm_manufacturer[GSM_PPP_MDM_MANUFACTURER_LENGTH];
 	char mdm_model[GSM_PPP_MDM_MODEL_LENGTH];
@@ -51,6 +53,41 @@ enum ring_indicator_behaviour {
 	ALWAYS,
 	AUTO,
 	WAVE,
+};
+
+struct gsm_ppp_gnss_data {
+	/**
+	 * UTC in format ddmmyyhhmmss.s
+	 */
+	char utc[GSM_PPP_GNSS_DATA_UTC_LEN];
+	/**
+	 * Latitude in 10^-5 degree.
+	 */
+	int32_t lat;
+	/**
+	 * Longitude in 10^-5 degree.
+	 */
+	int32_t lon;
+	/**
+	 * Altitude in mm.
+	 */
+	int32_t alt;
+	/**
+	 * Horizontal dilution of precision in 10^-1.
+	 */
+	uint16_t hdop;
+	/**
+	 * Course over ground in 10^-2 degree.
+	 */
+	uint16_t cog;
+	/**
+	 * Speed in 10^-1 km/h.
+	 */
+	uint16_t kmh;
+	/**
+	 * Number of satellites in use.
+	 */
+	uint16_t nsat;
 };
 
 /** @cond INTERNAL_HIDDEN */
@@ -129,5 +166,12 @@ void gsm_ppp_delete_all_sms(const struct device *dev);
  * @param dev: GSM modem device.
  */
 void gsm_ppp_clear_ring_indicator(const struct device *dev);
+
+/**
+ * @brief Clear the ring indicator of the modem.
+ *
+ * @param dev: GSM modem device.
+ */
+int gsm_ppp_query_gnss(struct gsm_ppp_gnss_data *data);
 
 #endif /* ZEPHYR_INCLUDE_DRIVERS_MODEM_GSM_PPP_H_ */
