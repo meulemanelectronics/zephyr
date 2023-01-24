@@ -14,12 +14,14 @@
 #define GSM_PPP_MDM_IMSI_LENGTH          16
 #define GSM_PPP_MDM_ICCID_LENGTH         32
 
+#if defined(CONFIG_MODEM_GMS_ENABLE_SMS)
 #define GSM_PPP_SMS_STATUS_LENGTH        16
 #define GSM_PPP_SMS_OA_LENGTH            16
 #define GSM_PPP_SMS_OA_NAME_LENGTH       32
 #define GSM_PPP_SMS_DATE_LENGTH          16
 #define GSM_PPP_SMS_TIME_LENGTH          16
 #define GSM_PPP_SMS_DATA_LENGTH         180
+#endif
 
 struct gsm_ppp_modem_info {
 	char mdm_manufacturer[GSM_PPP_MDM_MANUFACTURER_LENGTH];
@@ -33,6 +35,7 @@ struct gsm_ppp_modem_info {
 	int  mdm_rssi;
 };
 
+#if defined(CONFIG_MODEM_GMS_ENABLE_SMS)
 struct gsm_ppp_sms_message {
 	bool valid;
 	bool has_data;
@@ -50,6 +53,7 @@ enum ring_indicator_behaviour {
 	PULSE,
 	ALWAYS,
 };
+#endif
 
 /** @cond INTERNAL_HIDDEN */
 struct device;
@@ -85,6 +89,7 @@ void gsm_ppp_register_modem_power_callback(const struct device *dev,
  */
 const struct gsm_ppp_modem_info *gsm_ppp_modem_info(const struct device *dev, bool update_rssi);
 
+#if defined(CONFIG_MODEM_GMS_ENABLE_SMS)
 /**
  * @brief Set modem ring indicator behaviour.
  *
@@ -133,5 +138,6 @@ void gsm_ppp_delete_all_sms(const struct device *dev);
  * @param dev: GSM modem device.
  */
 void gsm_ppp_clear_ring_indicator(const struct device *dev);
+#endif /* defined(CONFIG_MODEM_GMS_ENABLE_SMS) */
 
 #endif /* ZEPHYR_INCLUDE_DRIVERS_MODEM_GSM_PPP_H_ */
