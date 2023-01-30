@@ -67,7 +67,7 @@ enum network_state {
  */
 enum setup_state {
 	STATE_INIT = 0,
-	STATE_CONTROL_CHANNEL = 0,
+	STATE_CONTROL_CHANNEL,
 	STATE_PPP_CHANNEL,
 	STATE_AT_CHANNEL,
 	STATE_DONE
@@ -967,20 +967,25 @@ static void mux_setup(struct k_work *work)
 	const struct device *uart = DEVICE_DT_GET(GSM_UART_NODE);
 	int ret;
 
-	/* We need to call this to reactivate mux ISR. Note: This is only called
-	 * after re-initing gsm_ppp.
-	 */
-	if (gsm->ppp_dev && gsm->state == STATE_CONTROL_CHANNEL) {
-		uart_mux_enable(gsm->ppp_dev);
-	}
-	if (gsm->at_dev && gsm->state == STATE_CONTROL_CHANNEL) {
-		uart_mux_enable(gsm->at_dev);
-	}
-	if (gsm->control_dev && gsm->state == STATE_CONTROL_CHANNEL) {
-		uart_mux_enable(gsm->control_dev);
-	}
-
 	switch (gsm->state) {
+	case STATE_INIT:
+		/* We need to call uart_mux_enable to reactivate mux ISR.
+		 * Note: This is only called after re-initing gsm_ppp.
+		 */
+		if (gsm->ppp_dev) {
+			uart_mux_enable(gsm->ppp_dev);
+		}
+		if (gsm->at_dev) {
+			uart_mux_enable(gsm->at_dev);
+		}
+		if (gsm->control_dev) {
+			uart_mux_enable(gsm->control_dev);
+		}
+
+		gsm->state = STATE_CONTROL_CHANNEL;
+		mux_setup_next(gsm);
+
+		break;
 	case STATE_CONTROL_CHANNEL:
 		/* Get UART device. There is one dev / DLCI */
 		if (gsm->control_dev == NULL) {
