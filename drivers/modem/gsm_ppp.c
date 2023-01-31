@@ -57,13 +57,6 @@ LOG_MODULE_REGISTER(modem_gsm, CONFIG_MODEM_LOG_LEVEL);
 	#define GSM_RSSI_MAXVAL         -51
 #endif
 
-const uint8_t disconnect_cmux[4][9] = {
-	{ 0xF9, 0x07, 0x53, 0x01, 0x3F, 0xF9, 0x00, 0x00, 0x00 },
-	{ 0xF9, 0x0B, 0x53, 0x01, 0xB8, 0xF9, 0x00, 0x00, 0x00 },
-	{ 0xF9, 0x0F, 0x53, 0x01, 0x7A, 0xF9, 0x00, 0x00, 0x00 },
-	{ 0xF9, 0x03, 0xEF, 0x05, 0xC3, 0x01, 0xF2, 0xF9, 0x00 },
-};
-
 /* Modem network registration state */
 enum network_state {
 	GSM_NET_INIT = -1,
@@ -81,7 +74,7 @@ enum network_state {
  */
 enum setup_state {
 	STATE_INIT = 0,
-	STATE_CONTROL_CHANNEL = 0,
+	STATE_CONTROL_CHANNEL,
 	STATE_PPP_CHANNEL,
 	STATE_AT_CHANNEL,
 	STATE_DONE
@@ -123,11 +116,11 @@ static struct gsm_modem {
 	bool mux_enabled : 1;
 	bool attached : 1;
 	bool modem_info_queried : 1;
-	bool kept_AT_channel : 1;
 
 	void *user_data;
 
 	gsm_modem_power_cb modem_on_cb;
+	gsm_modem_power_cb modem_configured_cb;
 	gsm_modem_power_cb modem_off_cb;
 	struct net_mgmt_event_callback gsm_mgmt_cb;
 } gsm;
@@ -1064,6 +1057,10 @@ attached:
 		}
 		modem_cmd_handler_tx_unlock(&gsm->context.cmd_handler);
 	}
+
+	if (gsm->modem_configured_cb) {
+		gsm->modem_configured_cb(gsm->dev, gsm->user_data);
+	}
 }
 
 static int mux_enable(struct gsm_modem *gsm)
@@ -1165,15 +1162,25 @@ static void mux_setup(struct k_work *work)
 	const struct device *uart = DEVICE_DT_GET(GSM_UART_NODE);
 	int ret;
 
-	/* We need to call this to reactivate mux ISR. Note: This is only called
-	 * after re-initing gsm_ppp.
-	 */
-	if (IS_ENABLED(CONFIG_GSM_MUX) &&
-	    gsm->ppp_dev && gsm->state == STATE_CONTROL_CHANNEL) {
-		uart_mux_enable(gsm->ppp_dev);
-	}
-
 	switch (gsm->state) {
+	case STATE_INIT:
+		/* We need to call uart_mux_enable to reactivate mux ISR.
+		 * Note: This is only called after re-initing gsm_ppp.
+		 */
+		if (gsm->ppp_dev) {
+			uart_mux_enable(gsm->ppp_dev);
+		}
+		if (gsm->at_dev) {
+			uart_mux_enable(gsm->at_dev);
+		}
+		if (gsm->control_dev) {
+			uart_mux_enable(gsm->control_dev);
+		}
+
+		gsm->state = STATE_CONTROL_CHANNEL;
+		mux_setup_next(gsm);
+
+		break;
 	case STATE_CONTROL_CHANNEL:
 		/* Get UART device. There is one dev / DLCI */
 		if (gsm->control_dev == NULL) {
@@ -1261,6 +1268,37 @@ fail:
 	gsm->mux_enabled = false;
 }
 
+void mux_disable(struct gsm_modem *gsm)
+{
+	int r;
+	if (IS_ENABLED(CONFIG_GSM_MUX)) {
+		if (gsm->at_dev) {
+			uart_mux_disconnect(gsm->at_dev, DLCI_AT);
+		}
+		if (gsm->ppp_dev) {
+			uart_mux_disconnect(gsm->ppp_dev, DLCI_PPP);
+		}
+		if (gsm->control_dev) {
+			uart_mux_disconnect(gsm->control_dev, DLCI_CONTROL);
+		}
+		if (gsm->at_dev) {
+			uart_mux_disable(gsm->at_dev);
+		}
+		if (gsm->ppp_dev) {
+			uart_mux_disable(gsm->ppp_dev);
+		}
+		if (gsm->control_dev) {
+			uart_mux_disable(gsm->control_dev);
+		}
+		gsm->mux_enabled = false;
+		r = modem_iface_uart_init_dev(&gsm->context.iface,
+					      DEVICE_DT_GET(GSM_UART_NODE));
+		if (r) {
+			LOG_ERR("modem_iface_uart_init returned %d", r);
+		}
+	}
+}
+
 static void gsm_configure(struct k_work *work)
 {
 	struct k_work_delayable *dwork = k_work_delayable_from_work(work);
@@ -1318,16 +1356,6 @@ void gsm_ppp_start(const struct device *dev)
 {
 	struct gsm_modem *gsm = dev->data;
 
-	/* Re-init underlying UART comms */
-	if (IS_ENABLED(CONFIG_GSM_MUX) && gsm->kept_AT_channel) {
-		/* Lower mux_enabled flag to trigger re-sending AT+CMUX etc */
-		gsm->mux_enabled = false;
-
-		if (gsm->ppp_dev) {
-			uart_mux_disable(gsm->ppp_dev);
-		}
-	}
-
 	int r = modem_iface_uart_init_dev(&gsm->context.iface,
 				DEVICE_DT_GET(GSM_UART_NODE));
 	if (r) {
@@ -1355,20 +1383,9 @@ void gsm_ppp_recover_cmux(const struct device *dev)
 
 	gsm_ppp_cancel(gsm);
 
-	modem_cmd_handler_disable_eol(&gsm->context.cmd_handler);
-
-	int i;
-	for (i = 0; i < ARRAY_SIZE(disconnect_cmux); i++)
-	{
-		(void)modem_cmd_send_nolock(&gsm->context.iface,
-				    &gsm->context.cmd_handler,
-				    NULL, 0,
-				    disconnect_cmux[i], &gsm->sem_response,
-				    GSM_CMD_AT_TIMEOUT);
-		k_msleep(1);
+	if (IS_ENABLED(CONFIG_GSM_MUX)) {
+		mux_disable(gsm);
 	}
-
-	modem_cmd_handler_restore_eol(&gsm->context.cmd_handler);
 }
 
 void gsm_ppp_stop(const struct device *dev, bool keep_AT_channel)
@@ -1383,22 +1400,14 @@ void gsm_ppp_stop(const struct device *dev, bool keep_AT_channel)
 	/* wait for the interface to be properly down */
 	(void)k_sem_take(&gsm->sem_if_down, K_FOREVER);
 
+	if (IS_ENABLED(CONFIG_GSM_MUX)) {
+		mux_disable(gsm);
+	}
+
 	if (!keep_AT_channel) {
-		if (IS_ENABLED(CONFIG_GSM_MUX)) {
-			/* Lower mux_enabled flag to trigger re-sending AT+CMUX etc */
-			gsm->mux_enabled = false;
-
-			if (gsm->ppp_dev) {
-				uart_mux_disable(gsm->ppp_dev);
-			}
-		}
-
 		if (modem_cmd_handler_tx_lock(&gsm->context.cmd_handler, GSM_CMD_LOCK_TIMEOUT)) {
 			LOG_WRN("Failed locking modem cmds!");
 		}
-		gsm->kept_AT_channel = false;
-	} else {
-		gsm->kept_AT_channel = true;
 	}
 
 	if (gsm->modem_off_cb) {
@@ -1411,12 +1420,14 @@ void gsm_ppp_stop(const struct device *dev, bool keep_AT_channel)
 
 void gsm_ppp_register_modem_power_callback(const struct device *dev,
 					   gsm_modem_power_cb modem_on,
+					   gsm_modem_power_cb modem_configured,
 					   gsm_modem_power_cb modem_off,
 					   void *user_data)
 {
 	struct gsm_modem *gsm = dev->data;
 
 	gsm->modem_on_cb = modem_on;
+	gsm->modem_configured_cb = modem_configured;
 	gsm->modem_off_cb = modem_off;
 
 	gsm->user_data = user_data;
@@ -1449,22 +1460,26 @@ char * gsm_ppp_get_ring_indicator_behaviour_text(enum ring_indicator_behaviour r
 	}
 }
 
-void gsm_ppp_generate_ring_indicator_at_cmd(char * cmd_buffer,
+bool gsm_ppp_generate_ring_indicator_at_cmd(char * cmd_buffer,
 					    size_t max_len,
 					    char * ring_type,
 					    enum ring_indicator_behaviour setting,
 					    uint16_t pule_duration)
 {
+	int ret;
+
 	if (setting == PULSE) {
-		snprintf(cmd_buffer, max_len, "AT+QCFG=\"%s\",\"%s\",%d",
-			 ring_type,
-			 gsm_ppp_get_ring_indicator_behaviour_text(setting),
-			 pule_duration);
+		ret = snprintf(cmd_buffer, max_len, "AT+QCFG=\"%s\",\"%s\",%d",
+			       ring_type,
+			       gsm_ppp_get_ring_indicator_behaviour_text(setting),
+			       pule_duration);
 	} else {
-		snprintf(cmd_buffer, max_len, "AT+QCFG=\"%s\",\"%s\"",
-			 ring_type,
-			 gsm_ppp_get_ring_indicator_behaviour_text(setting));
+		ret = snprintf(cmd_buffer, max_len, "AT+QCFG=\"%s\",\"%s\"",
+			       ring_type,
+			       gsm_ppp_get_ring_indicator_behaviour_text(setting));
 	}
+
+	return (ret > 0) && (ret < max_len);
 }
 
 void gsm_ppp_set_ring_indicator(const struct device *dev,
@@ -1477,26 +1492,35 @@ void gsm_ppp_set_ring_indicator(const struct device *dev,
 {
 	struct gsm_modem *gsm = dev->data;
 	int ret;
+	bool bret;
 	char cmd_buffer[64];
 
-	gsm_ppp_generate_ring_indicator_at_cmd(cmd_buffer, sizeof(cmd_buffer),
-					       "urc/ri/ring", ring, ring_pulse_duration);
-	ret = modem_cmd_send_nolock(&gsm->context.iface, &gsm->context.cmd_handler,
-				    &response_cmds[0], ARRAY_SIZE(response_cmds), cmd_buffer,
-				    &gsm->sem_response, GSM_CMD_SETUP_TIMEOUT);
+	bret = gsm_ppp_generate_ring_indicator_at_cmd(cmd_buffer, sizeof(cmd_buffer),
+						      "urc/ri/ring", ring, ring_pulse_duration);
+	if (bret) {
+		ret = modem_cmd_send_nolock(&gsm->context.iface, &gsm->context.cmd_handler,
+					    &response_cmds[0], ARRAY_SIZE(response_cmds), cmd_buffer,
+					    &gsm->sem_response, GSM_CMD_SETUP_TIMEOUT);
 
-	if (ret < 0) {
-		LOG_DBG("Could not set ring indicator setting");
+		if (ret < 0) {
+			LOG_DBG("Could not set ring indicator setting");
+		}
+	} else {
+		LOG_DBG("Could not generate ring indicator AT command string");
 	}
 
-	gsm_ppp_generate_ring_indicator_at_cmd(cmd_buffer, sizeof(cmd_buffer),
-					       "urc/ri/smsincoming", sms, sms_pulse_duration);
-	ret = modem_cmd_send_nolock(&gsm->context.iface, &gsm->context.cmd_handler,
-				    &response_cmds[0], ARRAY_SIZE(response_cmds), cmd_buffer,
-				    &gsm->sem_response, GSM_CMD_SETUP_TIMEOUT);
+	bret = gsm_ppp_generate_ring_indicator_at_cmd(cmd_buffer, sizeof(cmd_buffer),
+						      "urc/ri/smsincoming", sms, sms_pulse_duration);
+	if (bret) {
+		ret = modem_cmd_send_nolock(&gsm->context.iface, &gsm->context.cmd_handler,
+					    &response_cmds[0], ARRAY_SIZE(response_cmds), cmd_buffer,
+					    &gsm->sem_response, GSM_CMD_SETUP_TIMEOUT);
 
-	if (ret < 0) {
-		LOG_DBG("Could not set ring indicator setting for sms");
+		if (ret < 0) {
+			LOG_DBG("Could not set ring indicator setting for sms");
+		}
+	} else {
+		LOG_DBG("Could not generate ring indicator AT command string");
 	}
 
 	if (other == ALWAYS) {
@@ -1504,21 +1528,25 @@ void gsm_ppp_set_ring_indicator(const struct device *dev,
 		other = OFF;
 	}
 
-	gsm_ppp_generate_ring_indicator_at_cmd(cmd_buffer, sizeof(cmd_buffer),
-					       "urc/ri/other", other, other_pulse_duration);
-	ret = modem_cmd_send_nolock(&gsm->context.iface, &gsm->context.cmd_handler,
-				    &response_cmds[0], ARRAY_SIZE(response_cmds), cmd_buffer,
-				    &gsm->sem_response, GSM_CMD_SETUP_TIMEOUT);
+	bret = gsm_ppp_generate_ring_indicator_at_cmd(cmd_buffer, sizeof(cmd_buffer),
+						      "urc/ri/other", other, other_pulse_duration);
+	if (bret) {
+		ret = modem_cmd_send_nolock(&gsm->context.iface, &gsm->context.cmd_handler,
+					    &response_cmds[0], ARRAY_SIZE(response_cmds), cmd_buffer,
+					    &gsm->sem_response, GSM_CMD_SETUP_TIMEOUT);
 
-	if (ret < 0) {
-		LOG_DBG("Could not set ring indicator setting");
+		if (ret < 0) {
+			LOG_DBG("Could not set ring indicator setting");
+		}
+	} else {
+		LOG_DBG("Could not generate ring indicator AT command string");
 	}
 }
 
 static const struct setup_cmd sms_configure_cmds[] = {
 	/* Set SMS message format to text */
 	SETUP_CMD_NOHANDLE("AT+CMGF=1"),
-	/* Set SMS message reporting to message the receiver*/
+	/* Set SMS message reporting to message the receiver */
 	SETUP_CMD_NOHANDLE("AT+CNMI=2,1"),
 	/* Set SMS message character set */
 	SETUP_CMD_NOHANDLE("AT+CSCS=\"IRA\""),
@@ -1548,7 +1576,30 @@ static struct gsm_ppp_sms_message sms_message;
 /* Handler: <SMS message> */
 MODEM_CMD_DEFINE(on_cmd_atcmd_read_sms)
 {
-	if (argc >= 1 && strncmp(argv[0], "+CMGL: ", strlen("+CMGL: ")) == 0) {
+	/*
+	 * This handler consists of multiple parts. As the modem reports an SMS in the format
+	 * AT+CMGL: <SMS header>\r\n<SMS data>\r\n
+	 * the modem interface will split it between the header and the data.
+	 * Therefore, the read_sms_cmds is not set to filter on a specific response command.
+	 * We will filter on it in this handler.
+	 *
+	 * First the CMTI response of the modem is handled. It was just a message of the modem
+	 * indicating an SMS message was received. When incoming SMS messages are handled on
+	 * ring interrupt bases, this can still be received so we need to handle it.
+	 *
+	 * The handler checks whether the incoming data has the +CMGL: prefix indicating the
+	 * SMS header data. This is then parsed into the SMS message structure.
+	 *
+	 * The nest check is to see if just one piece of data was received. This would be the
+	 * SMS data part of the incoming message. It is placed in the data part of the
+	 * SMS message structure.
+	 *
+	 * Finally, when a piece of data is received not following these patterns, the message
+	 * is set to be not valid.
+	 */
+	if (strncmp(argv[0], "+CMTI: ", strlen("+CMTI: ")) == 0) {
+		LOG_DBG("SMS message received by modem");
+	} else if (argc >= 1 && strncmp(argv[0], "+CMGL: ", strlen("+CMGL: ")) == 0) {
 		sms_message.index = atoi(strchr(argv[0], ' '));
 
 		unquoted_strncpy(sms_message.status, argv[1], GSM_PPP_SMS_STATUS_LENGTH);
@@ -1582,10 +1633,33 @@ static const struct setup_cmd read_sms_cmds[] = {
 struct gsm_ppp_sms_message * gsm_ppp_read_sms(const struct device *dev)
 {
 	struct gsm_modem *gsm = dev->data;
-	int ret;
+	int ret = -1;
+	int retries = 100;
 
 	memset(&sms_message, 0, sizeof(sms_message));
 	sms_message.valid = true;
+
+	while (retries > 0) {
+		ret = modem_cmd_send_nolock(&gsm->context.iface,
+					    &gsm->context.cmd_handler,
+					    &response_cmds[0],
+					    ARRAY_SIZE(response_cmds),
+					    "AT", &gsm->sem_response,
+					    GSM_CMD_AT_TIMEOUT);
+		if (ret < 0) {
+			LOG_DBG("modem not ready %d", ret);
+		} else {
+			break;
+		}
+		k_msleep(500);
+		retries--;
+	}
+
+	if (ret < 0) {
+		LOG_DBG("Modem not responsive");
+		sms_message.valid = false;
+		return &sms_message;
+	}
 
 	ret = modem_cmd_handler_setup_cmds_nolock(&gsm->context.iface,
 						  &gsm->context.cmd_handler,
@@ -1596,6 +1670,7 @@ struct gsm_ppp_sms_message * gsm_ppp_read_sms(const struct device *dev)
 
 	if (ret < 0) {
 		LOG_DBG("No answer from reading sms messages");
+		sms_message.valid = false;
 	}
 
 	return &sms_message;

@@ -23,7 +23,9 @@
 #define GSM_PPP_SMS_DATA_LENGTH         180
 #endif
 
+#if defined(CONFIG_MODEM_GSM_ENABLE_GNSS)
 #define GSM_PPP_GNSS_DATA_UTC_LEN      	 64
+#endif
 
 #define GSM_PPP_GNSS_DATA_UTC_LEN      	 64
 
@@ -59,7 +61,7 @@ enum ring_indicator_behaviour {
 	PULSE,
 	ALWAYS,
 };
-#endif
+#endif  /* CONFIG_MODEM_GMS_ENABLE_SMS */
 
 #if defined(CONFIG_MODEM_GSM_ENABLE_GNSS)
 struct gsm_ppp_gnss_data {
@@ -113,12 +115,15 @@ void gsm_ppp_stop(const struct device *dev, bool keep_AT_channel);
  * @param dev: gsm modem device
  * @param modem_on: callback function to
  *		execute during gsm ppp configuring.
+ * @param modem_configured: callback function to
+ *		execute when modem is configured.
  * @param modem_off: callback function to
  *		execute during gsm ppp stopping.
  * @param user_data: user specified data
  */
 void gsm_ppp_register_modem_power_callback(const struct device *dev,
 					   gsm_modem_power_cb modem_on,
+					   gsm_modem_power_cb modem_configured,
 					   gsm_modem_power_cb modem_off,
 					   void *user_data);
 
@@ -181,8 +186,9 @@ void gsm_ppp_delete_all_sms(const struct device *dev);
  * @param dev: GSM modem device.
  */
 void gsm_ppp_clear_ring_indicator(const struct device *dev);
-#endif /* defined(CONFIG_MODEM_GMS_ENABLE_SMS) */
+#endif /* CONFIG_MODEM_GMS_ENABLE_SMS */
 
+#if defined(CONFIG_MODEM_GSM_ENABLE_GNSS)
 /**
  * @brief Starts the modem in gnss operation mode.
  *
@@ -204,6 +210,7 @@ int gsm_ppp_query_gnss(const struct device *dev, struct gsm_ppp_gnss_data *data)
  * @return 0 on success. Otherwise <0 is returned.
  */
 int gsm_ppp_stop_gnss(const struct device *dev);
+#endif /* CONFIG_MODEM_GSM_ENABLE_GNSS */
 
 /**
  * @brief Starts the modem in gnss operation mode.
