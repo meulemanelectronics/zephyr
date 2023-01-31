@@ -27,10 +27,6 @@
 #define GSM_PPP_GNSS_DATA_UTC_LEN      	 64
 #endif
 
-#define GSM_PPP_GNSS_DATA_UTC_LEN      	 64
-
-#define GSM_PPP_GNSS_DATA_UTC_LEN      	 64
-
 struct gsm_ppp_modem_info {
 	char mdm_manufacturer[GSM_PPP_MDM_MANUFACTURER_LENGTH];
 	char mdm_model[GSM_PPP_MDM_MODEL_LENGTH];
@@ -211,27 +207,5 @@ int gsm_ppp_query_gnss(const struct device *dev, struct gsm_ppp_gnss_data *data)
  */
 int gsm_ppp_stop_gnss(const struct device *dev);
 #endif /* CONFIG_MODEM_GSM_ENABLE_GNSS */
-
-/**
- * @brief Starts the modem in gnss operation mode.
- *
- * @return 0 on success. Otherwise <0 is returned.
- */
-int gsm_ppp_start_gnss(const struct device *dev);
-
-/**
- * @brief Query gnss position form the modem.
- *
- * @return 0 on success. If no fix is acquired yet -EAGAIN is returned.
- *         Otherwise <0 is returned.
- */
-int gsm_ppp_query_gnss(const struct device *dev, struct gsm_ppp_gnss_data *data);
-
-/**
- * @brief Stops the gnss operation mode of the modem.
- *
- * @return 0 on success. Otherwise <0 is returned.
- */
-int gsm_ppp_stop_gnss(const struct device *dev);
 
 #endif /* ZEPHYR_INCLUDE_DRIVERS_MODEM_GSM_PPP_H_ */
