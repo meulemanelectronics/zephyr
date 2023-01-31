@@ -87,6 +87,11 @@ struct modem_cmd {
 	MODEM_CMD(match_cmd_, func_cb_, num_param_, delim_) \
 }
 
+#define SETUP_CMD_ARGS_MAX(cmd_send_, match_cmd_, func_cb_, num_param_min, num_param_max, delim_) { \
+	.send_cmd = cmd_send_, \
+	MODEM_CMD_ARGS_MAX(match_cmd_, func_cb_, num_param_min, num_param_max, delim_) \
+}
+
 #define SETUP_CMD_NOHANDLE(send_cmd_) \
 		SETUP_CMD(send_cmd_, NULL, NULL, 0U, NULL)
 
@@ -295,17 +300,6 @@ int modem_cmd_handler_tx_lock(struct modem_cmd_handler *handler,
  * @param  *handler: command handler to unlock
  */
 void modem_cmd_handler_tx_unlock(struct modem_cmd_handler *handler);
-
-/**
- * @brief  Disable the end of line character(s) after sending a command
- */
-void modem_cmd_handler_disable_eol(struct modem_cmd_handler *handler);
-
-/**
- * @brief  Restore the end of line character(s) after sending a command
- */
-void modem_cmd_handler_restore_eol(struct modem_cmd_handler *handler);
-
 
 #ifdef __cplusplus
 }

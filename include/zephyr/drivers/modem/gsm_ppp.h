@@ -14,6 +14,15 @@
 #define GSM_PPP_MDM_IMSI_LENGTH          16
 #define GSM_PPP_MDM_ICCID_LENGTH         32
 
+#if defined(CONFIG_MODEM_GMS_ENABLE_SMS)
+#define GSM_PPP_SMS_STATUS_LENGTH        16
+#define GSM_PPP_SMS_OA_LENGTH            16
+#define GSM_PPP_SMS_OA_NAME_LENGTH       32
+#define GSM_PPP_SMS_DATE_LENGTH          16
+#define GSM_PPP_SMS_TIME_LENGTH          16
+#define GSM_PPP_SMS_DATA_LENGTH         180
+#endif
+
 struct gsm_ppp_modem_info {
 	char mdm_manufacturer[GSM_PPP_MDM_MANUFACTURER_LENGTH];
 	char mdm_model[GSM_PPP_MDM_MODEL_LENGTH];
@@ -26,13 +35,33 @@ struct gsm_ppp_modem_info {
 	int  mdm_rssi;
 };
 
+#if defined(CONFIG_MODEM_GMS_ENABLE_SMS)
+struct gsm_ppp_sms_message {
+	bool valid;
+	bool has_data;
+	int index;
+	char status[GSM_PPP_SMS_STATUS_LENGTH];
+	char origin_address[GSM_PPP_SMS_OA_LENGTH];
+	char origin_name[GSM_PPP_SMS_OA_NAME_LENGTH];
+	char date[GSM_PPP_SMS_DATE_LENGTH];
+	char time[GSM_PPP_SMS_TIME_LENGTH];
+	char data[GSM_PPP_SMS_DATA_LENGTH];
+};
+
+enum ring_indicator_behaviour {
+	OFF,
+	PULSE,
+	ALWAYS,
+};
+#endif
+
 /** @cond INTERNAL_HIDDEN */
 struct device;
 typedef void (*gsm_modem_power_cb)(const struct device *, void *);
 
 void gsm_ppp_start(const struct device *dev);
 void gsm_ppp_recover_cmux(const struct device *dev);
-void gsm_ppp_stop(const struct device *dev);
+void gsm_ppp_stop(const struct device *dev, bool keep_AT_channel);
 /** @endcond */
 
 /**
@@ -41,12 +70,15 @@ void gsm_ppp_stop(const struct device *dev);
  * @param dev: gsm modem device
  * @param modem_on: callback function to
  *		execute during gsm ppp configuring.
+ * @param modem_configured: callback function to
+ *		execute when modem is configured.
  * @param modem_off: callback function to
  *		execute during gsm ppp stopping.
  * @param user_data: user specified data
  */
 void gsm_ppp_register_modem_power_callback(const struct device *dev,
 					   gsm_modem_power_cb modem_on,
+					   gsm_modem_power_cb modem_configured,
 					   gsm_modem_power_cb modem_off,
 					   void *user_data);
 
@@ -54,9 +86,61 @@ void gsm_ppp_register_modem_power_callback(const struct device *dev,
  * @brief Get GSM modem information.
  *
  * @param dev: GSM modem device.
+ * @param update_rssi: Whether to update the rssi before obtaining the modem info.
  *
  * @retval struct gsm_ppp_modem_info * pointer to modem information structure.
  */
-const struct gsm_ppp_modem_info *gsm_ppp_modem_info(const struct device *dev);
+const struct gsm_ppp_modem_info *gsm_ppp_modem_info(const struct device *dev, bool update_rssi);
+
+#if defined(CONFIG_MODEM_GMS_ENABLE_SMS)
+/**
+ * @brief Set modem ring indicator behaviour.
+ *
+ * @param dev: GSM modem device.
+ * @param ring: Ring indicator behaviour when ring is presented.
+ * @param ring_pulse_duration: Ring indicator pulse duration when ring behavior set to pulse.
+ * @param sms: Ring indicator behaviour when SMS is presented.
+ * @param sms_pulse_duration: SMS indicator pulse duration when SMS behavior set to pulse.
+ * @param other: Ring indicator behaviour when other is presented.
+ * @param other_pulse_duration: Other indicator pulse duration when other behavior set to pulse.
+ */
+void gsm_ppp_set_ring_indicator(const struct device *dev,
+				enum ring_indicator_behaviour ring,
+				uint16_t ring_pulse_duration,
+				enum ring_indicator_behaviour sms,
+				uint16_t sms_pulse_duration,
+				enum ring_indicator_behaviour other,
+				uint16_t other_pulse_duration);
+
+/**
+ * @brief Configure modem for receiving SMS messages.
+ *
+ * @param dev: GSM modem device.
+ */
+void gsm_ppp_configure_sms_reception(const struct device *dev);
+
+/**
+ * @brief Read a SMS message from the modem.
+ *
+ * @param dev: GSM modem device.
+ *
+ * @retval struct gsm_ppp_sms_message * pointer to the received SMS information
+ */
+struct gsm_ppp_sms_message * gsm_ppp_read_sms(const struct device *dev);
+
+/**
+ * @brief Delete all SMS messages from the modem storage.
+ *
+ * @param dev: GSM modem device.
+ */
+void gsm_ppp_delete_all_sms(const struct device *dev);
+
+/**
+ * @brief Clear the ring indicator of the modem.
+ *
+ * @param dev: GSM modem device.
+ */
+void gsm_ppp_clear_ring_indicator(const struct device *dev);
+#endif /* defined(CONFIG_MODEM_GMS_ENABLE_SMS) */
 
 #endif /* ZEPHYR_INCLUDE_DRIVERS_MODEM_GSM_PPP_H_ */
