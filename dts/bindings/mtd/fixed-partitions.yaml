@@ -76,14 +76,19 @@ child-binding:
     look like this:
 
       partition_nodelabel: partition@START_OFFSET {
-              label = "human-readable-name";
+              partition-name = "human-readable-name";
               reg = <0xSTART_OFFSET 0xSIZE>;
       };
   properties:
-    label:
-      type: string
-      description: |
-        Human readable string describing the flash partition.
+       label:
+          type: string
+          required: false
+          description: Human readable string describing the device (used as device_get_binding() argument)
+       partition-name:
+          type: string
+          required: false
+          description: Same as label, but as label is deprecated since Zephyr v3.2, this is to reduce compilation warnings
+
     read-only:
       type: boolean
       description: set this property if the partition is read-only

@@ -32,9 +32,9 @@ static void fa_cb(const struct flash_area *fa, void *user_data)
 static int cmd_flash_map_list(const struct shell *shell, size_t argc,
 			      char **argv)
 {
-	shell_print(shell, "ID | Device     | Device Name               "
-		    "| Label              |   Offset   |   Size");
-	shell_print(shell, "-----------------------------------------"
+	shell_print(shell, "ID | Device | Device Name        "
+		    "| Name               | Offset     | Size");
+	shell_print(shell, "---------------------------------"
 		    "---------------------------------------------");
 	flash_area_foreach(fa_cb, (struct shell *)shell);
 	return 0;
