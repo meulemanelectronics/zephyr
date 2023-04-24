@@ -85,23 +85,6 @@ enum adc_reference {
  * @brief Structure for specifying the configuration of an ADC channel.
  */
 struct adc_channel_cfg {
-	/** Gain selection. */
-	enum adc_gain gain;
-
-	/** Reference selection. */
-	enum adc_reference reference;
-
-	/**
-	 * Acquisition time.
-	 * Use the ADC_ACQ_TIME macro to compose the value for this field or
-	 * pass ADC_ACQ_TIME_DEFAULT to use the default setting for a given
-	 * hardware (e.g. when the hardware does not allow to configure the
-	 * acquisition time).
-	 * Particular drivers do not necessarily support all the possible units.
-	 * Value range is 0-16383 for a given unit.
-	 */
-	uint16_t acquisition_time;
-
 	/**
 	 * Channel identifier.
 	 * This value primarily identifies the channel within the ADC API - when
@@ -125,6 +108,23 @@ struct adc_channel_cfg {
 	 * Kconfig option).
 	 */
 	uint8_t channel_id   : 5;
+
+	/** Gain selection. */
+	enum adc_gain gain;
+
+	/** Reference selection. */
+	enum adc_reference reference;
+
+	/**
+	 * Acquisition time.
+	 * Use the ADC_ACQ_TIME macro to compose the value for this field or
+	 * pass ADC_ACQ_TIME_DEFAULT to use the default setting for a given
+	 * hardware (e.g. when the hardware does not allow to configure the
+	 * acquisition time).
+	 * Particular drivers do not necessarily support all the possible units.
+	 * Value range is 0-16383 for a given unit.
+	 */
+	uint16_t acquisition_time;
 
 	/** Channel type: single-ended or differential. */
 	uint8_t differential : 1;
