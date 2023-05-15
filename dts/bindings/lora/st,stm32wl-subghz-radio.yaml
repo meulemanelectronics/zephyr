@@ -42,3 +42,15 @@ properties:
         - 17
         - 20
         - 22
+
+    hse-in-trimr:
+      type: int
+      default: 18
+      description: |
+        Capacitance value of the IN bank of the oscillator module. 0(11.3pF ) to 47(33.4pF) with steps of ~0.47pF
+
+    hse-out-trimr:
+      type: int
+      default: 18
+      description: |
+        Capacitance value of the OUT bank of the oscillator module. 0(11.3pF ) to 47(33.4pF) with steps of ~0.47pF
