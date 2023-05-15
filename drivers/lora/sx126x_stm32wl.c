@@ -11,9 +11,10 @@
 #include <stm32wlxx_ll_exti.h>
 #include <stm32wlxx_ll_pwr.h>
 #include <stm32wlxx_ll_rcc.h>
-
+#include <zephyr/sys/util.h>
 #include <zephyr/logging/log.h>
 #include <zephyr/irq.h>
+
 LOG_MODULE_DECLARE(sx126x, CONFIG_LORA_LOG_LEVEL);
 
 static const enum {
@@ -30,10 +31,18 @@ void sx126x_reset(struct sx126x_data *dev_data)
 	k_sleep(K_MSEC(10));
 }
 
+void SX126xSetOscillatorCapacitorBanks(void)
+{
+	uint8_t xta_trim[2] = { CLAMP(DT_INST_PROP(0, hse_in_trimr), 0, 0x2F),
+				CLAMP(DT_INST_PROP(0, hse_out_trimr), 0, 0x2F) };
+	SX126xWriteRegisters(REG_XTA_TRIM, xta_trim, 2);
+}
+
 void sx126x_set_tx_params(int8_t power, RadioRampTimes_t ramp_time)
 {
 	uint8_t buf[2];
 
+	SX126xSetOscillatorCapacitorBanks();
 	if (pa_output == RFO_LP) {
 		const int8_t max_power = DT_INST_PROP(0, rfo_lp_max_power);
 
