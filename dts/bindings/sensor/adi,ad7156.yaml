@@ -1,0 +1,13 @@
+description: AD7156 2-Channel Capacitance Converter
+
+compatible: "adi,ad7156"
+
+include: [sensor-device.yaml, i2c-device.yaml]
+
+properties:
+  int-gpios:
+    type: phandle-array
+    description: |
+      The OUTx signals defaults to active high as produced by the
+      sensor.  The property value should ensure the flags properly
+      describe the signal that is presented to the driver.

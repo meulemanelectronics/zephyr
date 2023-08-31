@@ -182,6 +182,11 @@ enum sensor_channel {
 	/** Desired charging current in mA */
 	SENSOR_CHAN_GAUGE_DESIRED_CHARGING_CURRENT,
 
+	/** Capacitance on channel 1 in pF */
+	SENSOR_CHAN_CAP_1,
+	/** Capacitance on channel 2 in pF */
+	SENSOR_CHAN_CAP_2,
+
 	/** All channels. */
 	SENSOR_CHAN_ALL,
 
