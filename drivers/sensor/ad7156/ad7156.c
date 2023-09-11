@@ -31,7 +31,7 @@ static void ad7156_reset(const struct device *dev)
 	struct ad7156_data *drv_data = dev->data;
 	const struct ad7156_dev_config *cfg = dev->config;
 
-	i2c_reg_write_byte(dev, cfg->i2c.addr, AD7156_RESET_CMD, 1);
+	i2c_reg_write_byte_dt(&cfg->i2c, AD7156_RESET_CMD, 1);
 }
 
 /*******************************************************************************
@@ -52,7 +52,7 @@ static int ad7156_set_power_mode(const struct device *dev, enum ad7156_powermode
 	const struct ad7156_dev_config *cfg = dev->config;
 	int ret = 0;
 
-	ret = i2c_reg_update_byte(dev, cfg->i2c.addr, AD7156_REG_CONFIG,
+	ret = i2c_reg_update_byte_dt(&cfg->i2c, AD7156_REG_CONFIG,
 				  AD7156_CONFIG_MD_MASK, AD7156_CONFIG_MD(pwr_mode));
 
 	return ret;
@@ -82,7 +82,7 @@ static int ad7156_channel_state(const struct device *dev, uint8_t channel, uint8
 	channel_mask |= (channel & AD7156_CHANNEL2) ? AD7156_CONFIG_EN_CH2 : 0;
 	value_mask = (enable_conv) ? channel_mask : 0;
 
-	ret = i2c_reg_update_byte(dev, cfg->i2c.addr, AD7156_REG_CONFIG, channel_mask,
+	ret = i2c_reg_update_byte_dt(&cfg->i2c, AD7156_REG_CONFIG, channel_mask,
 				  value_mask);
 
 	return ret;
@@ -107,7 +107,7 @@ static int ad7156_set_capdac_range(const struct device *dev, uint8_t channel, ui
 	int ret = 0;
 
 	uint8_t reg_address = (channel == AD7156_CHANNEL1) ? AD7156_REG_CH1_CAPDAC : AD7156_REG_CH2_CAPDAC;
-	ret = i2c_reg_update_byte(dev, cfg->i2c.addr, reg_address,
+	ret = i2c_reg_update_byte_dt(&cfg->i2c, reg_address,
 				  AD7156_CAPDAC_DAC_VAL_MASK, AD7156_CAPDAC_DAC_VAL(range));
 
 	return ret;
@@ -131,7 +131,7 @@ static int ad7156_get_capdac_range(const struct device *dev, uint8_t channel, ui
 	int ret = 0;
 
 	uint8_t reg_address = (channel == AD7156_CHANNEL1) ? AD7156_REG_CH1_CAPDAC : AD7156_REG_CH2_CAPDAC;
-	ret = i2c_reg_read_byte(dev, cfg->i2c.addr, reg_address, range);
+	ret = i2c_reg_read_byte_dt(&cfg->i2c, reg_address, range);
 
 	*range = AD7156_CAPDAC_DAC_VAL(*range);
 
@@ -160,7 +160,7 @@ static int ad7156_set_range(const struct device *dev, uint8_t channel, enum ad71
 	int ret = 0;
 
 	uint8_t reg_address = (channel == AD7156_CHANNEL1) ? AD7156_REG_CH1_SETUP : AD7156_REG_CH2_SETUP;
-	ret = i2c_reg_update_byte(dev, cfg->i2c.addr, reg_address,
+	ret = i2c_reg_update_byte_dt(&cfg->i2c, reg_address,
 				  AD7156_SETUP_RANGE_MASK, AD7156_SETUP_RANGE(range));
 
 	return ret;
@@ -189,7 +189,7 @@ static int ad7156_get_range(const struct device *dev, uint32_t channel, float *v
 
 	uint8_t reg_address = (channel == AD7156_CHANNEL1) ? AD7156_REG_CH1_SETUP : AD7156_REG_CH2_SETUP;
 
-	ret = i2c_reg_read_byte(dev, cfg->i2c.addr, reg_address, &setup_reg);
+	ret = i2c_reg_read_byte_dt(&cfg->i2c, reg_address, &setup_reg);
 
 	if (ret) {
 		return ret;
@@ -236,8 +236,8 @@ static int ad7156_set_threshold_mode(const struct device *dev, enum ad7156_thr_m
 	const struct ad7156_dev_config *cfg = dev->config;
 	int ret = 0;
 
-	ret = i2c_reg_update_byte(
-		dev, cfg->i2c.addr, AD7156_REG_CONFIG, AD7156_CONFIG_THR_MASK,
+	ret = i2c_reg_update_byte_dt(
+		&cfg->i2c, AD7156_REG_CONFIG, AD7156_CONFIG_THR_MASK,
 		(AD7156_CONFIG_THR_FIXED * thr_fixed) | (AD7156_CONFIG_THR_MD(thr_mode)));
 
 	return ret;
@@ -278,7 +278,7 @@ static int ad7156_set_threshold(const struct device *dev, uint8_t channel, float
 		raw_thr = 0x3000;
 	}
 
-	ret = i2c_burst_write(dev, cfg->i2c.addr, thr_reg_address, raw_thr, 2);
+	ret = i2c_burst_write_dt(&cfg->i2c, thr_reg_address, raw_thr, 2);
 
 	return ret;
 }
@@ -317,8 +317,7 @@ static int ad7156_set_sensitivity(const struct device *dev, uint8_t channel, flo
 	raw_sensitivity = (uint16_t)(p_fsensitivity * 0xA00 / range);
 	raw_sensitivity = (raw_sensitivity << 4) & 0x0FF0;
 
-	ret = i2c_burst_write(dev, cfg->i2c.addr, sensitivity_reg_addr, raw_sensitivity,
-			      2);
+	ret = i2c_burst_write_dt(&cfg->i2c, sensitivity_reg_addr, raw_sensitivity, 2);
 
 	return ret;
 }
@@ -347,7 +346,7 @@ static int ad7156_read_channel_data(const struct device *dev, uint8_t channel, u
 	uint8_t reg_data[2] = { 0, 0 };
 	uint8_t ch_address = (channel == AD7156_CHANNEL1) ? AD7156_REG_CH1_DATA_MSB : AD7156_REG_CH2_DATA_MSB;
 
-	ret = i2c_burst_read(dev, cfg->i2c.addr, ch_address, reg_data, 2);
+	ret = i2c_burst_read_dt(&cfg->i2c, ch_address, reg_data, 2);
 	if (ret) {
 		return ret;
 	}
@@ -394,13 +393,13 @@ static int ad7156_wait_read_channel_data(const struct device *dev, uint8_t chann
 	}
 
 	do {
-		ret = i2c_reg_read_byte(dev, cfg->i2c.addr, AD7156_REG_STATUS, &status);
+		ret = i2c_reg_read_byte_dt(&cfg->i2c, AD7156_REG_STATUS, &status);
 		if (ret) {
 			return ret;
 		}
 	} while ((status & ch_rdy_mask) != 0);
 
-	ret = i2c_burst_read(dev, cfg->i2c.addr, ch_address, reg_data, 2);
+	ret = i2c_burst_read_dt(&cfg->i2c, ch_address, reg_data, 2);
 	if (ret) {
 		return ret;
 	}
@@ -578,7 +577,6 @@ static int ad7156_attr_set(const struct device *dev,
 	case SENSOR_ATTR_AD7156_CAPDAC_MODE:
 
 
-
 	default:
 		return -ENOTSUP;
 	}
@@ -654,12 +652,11 @@ static const struct sensor_driver_api ad7156_driver_api = {
 
 static int ad7156_probe(const struct device *dev)
 {
-	struct ad7156_data *drv_data = dev->data;
 	const struct ad7156_dev_config *cfg = dev->config;
 	uint8_t value;
 	int ret = 0;
 
-	ret = i2c_reg_read_byte(dev, cfg->i2c.addr, AD7156_REG_CHIP_ID, &value);
+	ret = i2c_reg_read_byte_dt(&cfg->i2c, AD7156_REG_CHIP_ID, &value);
 	if (ret) {
 		return ret;
 	}
@@ -668,7 +665,7 @@ static int ad7156_probe(const struct device *dev)
 		return -ENODEV;
 	}
 
-	ret = i2c_reg_update_byte(dev, cfg->i2c.addr, AD7156_REG_CONFIG,
+	ret = i2c_reg_update_byte_dt(&cfg->i2c, AD7156_REG_CONFIG,
 				  AD7156_CONFIG_MD_MASK,
 				  AD7156_CONFIG_MD(AD7156_CONV_MODE_CONT_CONV));
 	if (ret) {
@@ -708,13 +705,11 @@ static int ad7156_init(const struct device *dev)
 		LOG_ERR("Bus device is not ready");
 		return -EINVAL;
 	}
-
 	return ad7156_probe(dev);
 }
 
 #define AD7156_DEFINE(inst)								\
 	static struct ad7156_data ad7156_data_##inst;					\
-											\
 	static const struct ad7156_dev_config ad7156_config_##inst = {		\
 		.i2c = I2C_DT_SPEC_INST_GET(inst),					\
 											\
