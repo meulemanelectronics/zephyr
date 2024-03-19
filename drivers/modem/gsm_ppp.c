@@ -535,7 +535,7 @@ int gsm_ppp_start_gnss(const struct device *dev)
 {
 	struct gsm_modem *gsm = dev->data;
 	gsm_ppp_lock(gsm);
-	int ret = modem_cmd_send(&gsm->context.iface, &gsm->context.cmd_handler, NULL, 0U, "AT+QGPS=1",
+	int ret = modem_cmd_send(&gsm->context.iface, &gsm->context.cmd_handler, NULL, 0U, "AT+QGPS=1,30,50,0,1",
 			     &gsm->sem_response, GSM_CMD_AT_TIMEOUT);
 	if (ret < 0) {
 		gsm_ppp_unlock(gsm);
