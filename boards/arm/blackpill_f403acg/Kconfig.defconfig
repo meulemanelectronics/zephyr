@@ -1,0 +1,15 @@
+# Copyright (c) 2024 Rick Bruyninckx
+# SPDX-License-Identifier: Apache-2.0
+
+# AT32F403ACGU7 based Black Pill V1.0 board board configuration
+
+if BOARD_BLACKPILL_F403ACG
+
+config BOARD
+	default "blackpill_f403acg"
+
+config SPI_STM32_INTERRUPT
+	default y
+	depends on SPI
+
+endif # BOARD_BLACKPILL_F403ACG

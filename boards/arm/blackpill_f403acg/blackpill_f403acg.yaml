@@ -1,0 +1,16 @@
+identifier: blackpill_at32f403acg
+name: WeAct Studio Black Pill V1.0 (AT32F403ACG)
+type: mcu
+arch: arm
+toolchain:
+  - zephyr
+  - gnuarmemb
+  - xtools
+supported:
+  - counter
+  - spi
+  - usb
+  - i2c
+  - uart
+  - pwm
+  - adc
