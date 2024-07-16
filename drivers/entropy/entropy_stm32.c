@@ -621,7 +621,7 @@ static int entropy_stm32_rng_init(const struct device *dev)
 
 #if defined(CONFIG_SOC_SERIES_STM32WBX)
 	LL_RCC_SetRNGClockSource(LL_RCC_RNG_CLKSOURCE_CLK48);
-	LL_RCC_SetCLK48ClockSource(LL_RCC_CLK48_CLKSOURCE_HSI48);
+	LL_RCC_SetCLK48ClockSource(LL_RCC_CLK48_CLKSOURCE_MSI);
 
 	/* Don't unlock the HSEM to prevent M0 core
 	 * to disable HSI48 clock used for RNG.

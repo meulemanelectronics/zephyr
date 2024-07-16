@@ -126,16 +126,7 @@ __weak void pm_state_exit_post_ops(enum pm_state state, uint8_t substate_id)
 		case 3: /* STOP2 */
 			LL_LPM_DisableSleepOnExit();
 			LL_LPM_EnableSleep();
-			/* Use the HSI48 for the RNG */
-			LL_RCC_HSI48_Enable();
-			while (!LL_RCC_HSI48_IsReady()) {
-				/* Wait for HSI48 to become ready */
-			}
 
-#if defined(CONFIG_SOC_SERIES_STM32WBX)
-			LL_RCC_SetRNGClockSource(LL_RCC_RNG_CLKSOURCE_CLK48);
-			LL_RCC_SetCLK48ClockSource(LL_RCC_CLK48_CLKSOURCE_HSI48);
-#endif
 			break;
 		default:
 			LOG_DBG("Unsupported power substate-id %u", substate_id);
