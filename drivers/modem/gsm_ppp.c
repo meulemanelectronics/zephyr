@@ -770,6 +770,8 @@ static const struct modem_cmd check_attached_cmd =
 	MODEM_CMD("+CGATT:", on_cmd_atcmdinfo_attached, 1U, ",");
 
 static const struct setup_cmd connect_cmds[] = {
+        /* Enabled EDRX */
+        SETUP_CMD_NOHANDLE("AT+CEDRXS=1,4,\"0010\""),
 	/* connect to network */
 	SETUP_CMD_NOHANDLE("ATD*99#"),
 };
