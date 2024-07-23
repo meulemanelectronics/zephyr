@@ -1944,7 +1944,6 @@ static int gsm_init(const struct device *dev)
 		return ret;
 	}
 
-#if defined(CONFIG_MODEM_SHELL)
 	/* modem information storage */
 	gsm->context.data_manufacturer = gsm->minfo.mdm_manufacturer;
 	gsm->context.data_model = gsm->minfo.mdm_model;
@@ -1958,7 +1957,6 @@ static int gsm_init(const struct device *dev)
 	gsm->context.data_firmware_version = gsm->minfo.mdm_firmware_version;
 #endif
 	gsm->context.data_rssi = &gsm->minfo.mdm_rssi;
-#endif	/* CONFIG_MODEM_SHELL */
 
 	gsm->context.is_automatic_oper = false;
 	gsm->gsm_data.rx_rb_buf = &gsm->gsm_rx_rb_buf[0];
