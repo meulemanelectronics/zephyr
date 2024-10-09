@@ -39,6 +39,12 @@ properties:
         Invert the binary logic of rx pin. When enabled, physical logic levels are inverted and
         we use 1=Low, 0=High instead of 1=High, 0=Low.
 
+    tx-rx-swap:
+      type: boolean
+      required: false
+      description: |
+        Swap the TX and RX line.
+
     pinctrl-0:
       required: true
 

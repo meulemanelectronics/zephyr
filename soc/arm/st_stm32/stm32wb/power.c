@@ -119,17 +119,17 @@ __weak void pm_state_exit_post_ops(enum pm_state state, uint8_t substate_id)
 		LOG_DBG("Unsupported power state %u", state);
 	} else {
 		switch (substate_id) {
-		case 1:	/* STOP0 */
+		case 1: /* STOP0 */
 			__fallthrough;
-		case 2:	/* STOP1 */
+		case 2: /* STOP1 */
 			__fallthrough;
-		case 3:	/* STOP2 */
+		case 3: /* STOP2 */
 			LL_LPM_DisableSleepOnExit();
 			LL_LPM_EnableSleep();
+
 			break;
 		default:
-			LOG_DBG("Unsupported power substate-id %u",
-				substate_id);
+			LOG_DBG("Unsupported power substate-id %u", substate_id);
 			break;
 		}
 		/* need to restore the clock */
