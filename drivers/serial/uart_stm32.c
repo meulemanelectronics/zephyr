@@ -1023,18 +1023,17 @@ static void uart_stm32_isr(const struct device *dev)
 
 		LOG_DBG("idle interrupt occurred");
 
-		/* Start the RX timer */
-		async_timer_start(&data->dma_rx.timeout_work,
-							data->dma_rx.timeout);
-
 		if (data->dma_rx.timeout == 0) {
 			uart_stm32_dma_rx_flush(dev);
+		} else {
+			/* Start the RX timer not null */
+			async_timer_start(&data->dma_rx.timeout_work,
+								data->dma_rx.timeout);
 		}
 	} else if (LL_USART_IsEnabledIT_TC(config->usart) &&
 			LL_USART_IsActiveFlag_TC(config->usart)) {
 
 		LL_USART_DisableIT_TC(config->usart);
-		LL_USART_ClearFlag_TC(config->usart);
 		/* Generate TX_DONE event when transmission is done */
 		async_evt_tx_done(data);
 
@@ -1055,6 +1054,19 @@ static void uart_stm32_isr(const struct device *dev)
 	/* Clear errors */
 	uart_stm32_err_check(dev);
 #endif /* CONFIG_UART_ASYNC_API */
+
+#if defined(CONFIG_PM) && defined(IS_UART_WAKEUP_FROMSTOP_INSTANCE) \
+	&& defined(USART_CR3_WUFIE)
+	if (LL_USART_IsEnabledIT_WKUP(config->usart) &&
+		LL_USART_IsActiveFlag_WKUP(config->usart)) {
+
+		LL_USART_ClearFlag_WKUP(config->usart);
+#ifdef USART_ISR_REACK
+		while (LL_USART_IsActiveFlag_REACK(config->usart) == 0) {
+		}
+#endif
+	}
+#endif
 }
 #endif /* CONFIG_UART_INTERRUPT_DRIVEN || CONFIG_UART_ASYNC_API || CONFIG_PM */
 
@@ -1673,6 +1685,27 @@ static int uart_stm32_init(const struct device *dev)
 	LL_USART_EnableFIFO(config->usart);
 #endif /* CONFIG_UART_STM32_FIFO_ENABLE */
 
+#if defined(CONFIG_PM) && defined(IS_UART_WAKEUP_FROMSTOP_INSTANCE)
+	if (config->wakeup_source) {
+		/* Enable ability to wakeup device in Stop mode
+		 * Effect depends on CONFIG_PM_DEVICE status:
+		 * CONFIG_PM_DEVICE=n : Always active
+		 * CONFIG_PM_DEVICE=y : Controlled by pm_device_wakeup_enable()
+		 */
+#ifdef USART_CR3_WUFIE
+		LL_USART_SetWKUPType(config->usart, LL_USART_WAKEUP_ON_RXNE);
+		LL_USART_EnableIT_WKUP(config->usart);
+		LL_USART_ClearFlag_WKUP(config->usart);
+#endif
+		LL_USART_EnableInStopMode(config->usart);
+
+		if (config->wakeup_line != STM32_EXTI_LINE_NONE) {
+			/* Prepare the WAKEUP with the expected EXTI line */
+			LL_EXTI_EnableIT_0_31(BIT(config->wakeup_line));
+		}
+	}
+#endif /* CONFIG_PM */
+
 	LL_USART_Enable(config->usart);
 
 #ifdef USART_ISR_TEACK
@@ -1693,21 +1726,6 @@ static int uart_stm32_init(const struct device *dev)
 	config->irq_config_func(dev);
 #endif /* CONFIG_PM || CONFIG_UART_INTERRUPT_DRIVEN || CONFIG_UART_ASYNC_API */
 
-#if defined(CONFIG_PM) && defined(IS_UART_WAKEUP_FROMSTOP_INSTANCE)
-	if (config->wakeup_source) {
-		/* Enable ability to wakeup device in Stop mode
-		 * Effect depends on CONFIG_PM_DEVICE status:
-		 * CONFIG_PM_DEVICE=n : Always active
-		 * CONFIG_PM_DEVICE=y : Controlled by pm_device_wakeup_enable()
-		 */
-		LL_USART_EnableInStopMode(config->usart);
-		if (config->wakeup_line != STM32_EXTI_LINE_NONE) {
-			/* Prepare the WAKEUP with the expected EXTI line */
-			LL_EXTI_EnableIT_0_31(BIT(config->wakeup_line));
-		}
-	}
-#endif /* CONFIG_PM */
-
 #ifdef CONFIG_UART_ASYNC_API
 	return uart_stm32_async_init(dev);
 #else
@@ -1719,21 +1737,35 @@ static int uart_stm32_init(const struct device *dev)
 static void uart_stm32_suspend_setup(const struct device *dev)
 {
 	const struct uart_stm32_config *config = dev->config;
+	USART_TypeDef *usart = config->usart;
+
+#if defined(CONFIG_PM) && defined(IS_UART_WAKEUP_FROMSTOP_INSTANCE) \
+	&& defined(USART_CR3_WUFIE)
+	if (LL_USART_IsEnabledIT_WKUP(config->usart) &&
+		LL_USART_IsActiveFlag_WKUP(config->usart)) {
+
+		LL_USART_ClearFlag_WKUP(config->usart);
+#ifdef USART_ISR_REACK
+		while (LL_USART_IsActiveFlag_REACK(config->usart) == 0) {
+		}
+#endif
+	}
+#endif
 
 #ifdef USART_ISR_BUSY
 	/* Make sure that no USART transfer is on-going */
-	while (LL_USART_IsActiveFlag_BUSY(config->usart) == 1) {
+	while (LL_USART_IsActiveFlag_BUSY(usart) == 1) {
 	}
 #endif
-	while (LL_USART_IsActiveFlag_TC(config->usart) == 0) {
+	while (LL_USART_IsActiveFlag_TC(usart) == 0) {
 	}
 #ifdef USART_ISR_REACK
 	/* Make sure that USART is ready for reception */
-	while (LL_USART_IsActiveFlag_REACK(config->usart) == 0) {
+	while (LL_USART_IsActiveFlag_REACK(usart) == 0) {
 	}
 #endif
 	/* Clear OVERRUN flag */
-	LL_USART_ClearFlag_ORE(config->usart);
+	LL_USART_ClearFlag_ORE(usart);
 }
 
 static int uart_stm32_pm_action(const struct device *dev,
