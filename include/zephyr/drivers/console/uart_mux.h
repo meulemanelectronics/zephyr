@@ -84,7 +84,18 @@ static inline int uart_mux_attach(const struct device *mux,
 	return api->attach(mux, uart, dlci_address, cb, user_data);
 }
 
-void uart_mux_disconnect(const struct device *dev, uint8_t dlci_address);
+/**
+ * @brief Disconnect the physical/real UART from the UART muxing device.
+ *
+ * @param dev UART mux device structure.
+ * @param dlci_address DLCI id for the virtual muxing channel.
+ * @param timeout The Zephyr time to wait for the operation to complete.
+ *
+ * @retval 0 No errors, the disconnect succeeded.
+ * @retval -EBUSY Returned without waiting on the underlying semaphore.
+ * @retval -EAGAIN Waiting period timed out, or the underlying semaphore was reset during the waiting period.
+ */
+int uart_mux_disconnect(const struct device *dev, uint8_t dlci_address, k_timeout_t timeout);
 
 /**
  * @brief Get UART related to a specific DLCI channel

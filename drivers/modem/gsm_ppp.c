@@ -1402,13 +1402,13 @@ void mux_disable(struct gsm_modem *gsm)
 	int r;
 	if (IS_ENABLED(CONFIG_GSM_MUX)) {
 		if (gsm->at_dev) {
-			uart_mux_disconnect(gsm->at_dev, DLCI_AT);
+			(void)uart_mux_disconnect(gsm->at_dev, DLCI_AT, K_FOREVER);
 		}
 		if (gsm->ppp_dev) {
-			uart_mux_disconnect(gsm->ppp_dev, DLCI_PPP);
+			(void)uart_mux_disconnect(gsm->ppp_dev, DLCI_PPP, K_FOREVER);
 		}
 		if (gsm->control_dev) {
-			uart_mux_disconnect(gsm->control_dev, DLCI_CONTROL);
+			(void)uart_mux_disconnect(gsm->control_dev, DLCI_CONTROL, K_FOREVER);
 		}
 		if (gsm->at_dev) {
 			uart_mux_disable(gsm->at_dev);
