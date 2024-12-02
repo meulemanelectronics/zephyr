@@ -452,11 +452,11 @@ static int attach(const struct device *mux_uart, const struct device *uart,
 	return -ENOENT;
 }
 
-void uart_mux_disconnect(const struct device *dev, uint8_t dlci_address)
+int uart_mux_disconnect(const struct device *dev, uint8_t dlci_address, k_timeout_t timeout)
 {
 	struct uart_mux_dev_data *dev_data = dev->data;
 
-	gsm_mux_disconnect(dev_data->real_uart->mux, dlci_address, K_SECONDS(1));
+	return gsm_mux_disconnect(dev_data->real_uart->mux, dlci_address, timeout);
 }
 
 static int uart_mux_poll_in(const struct device *dev, unsigned char *p_char)
