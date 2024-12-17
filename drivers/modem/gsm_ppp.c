@@ -743,8 +743,6 @@ static const struct setup_cmd setup_cmds[] = {
 	SETUP_CMD_NOHANDLE("AT+CMEE=1"),
 	/* disable unsolicited network registration codes */
 	SETUP_CMD_NOHANDLE("AT+CREG=0"),
-	/* enable sleep mode */
-	SETUP_CMD_NOHANDLE("AT+QSCLK=1"),
 #if IS_ENABLED(DT_PROP(GSM_UART_NODE, hw_flow_control))
 	/* enable hardware flow control */
 	SETUP_CMD_NOHANDLE("AT+IFC=2,2"),
@@ -1462,6 +1460,16 @@ wait_at:
 				    GSM_CMD_AT_TIMEOUT);
 	if (ret < 0) {
 		LOG_DBG("modem not ready %d", ret);
+		goto retry;
+	}
+
+	ret = modem_cmd_send_nolock(&gsm->context.iface, &gsm->context.cmd_handler,
+				    &response_cmds[0],
+				    ARRAY_SIZE(response_cmds),
+				    "AT+QSCLK=1", &gsm->sem_response,
+				    GSM_CMD_AT_TIMEOUT);
+	if (ret < 0) {
+		LOG_ERR("AT+QSCLK=1 ret:%d", ret);
 		goto retry;
 	}
 
