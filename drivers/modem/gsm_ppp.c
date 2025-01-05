@@ -1229,7 +1229,7 @@ static int mux_enable(struct gsm_modem *gsm)
 		/* Arbitrary delay for Quectel modems to initialize the CMUX,
 		 * without this the AT cmd will fail.
 		 */
-		(void)k_sleep(K_MSEC(50));
+		(void)k_sleep(GSM_CMD_AT_TIMEOUT);
 	} else {
 		/* Generic GSM modem */
 		ret = modem_cmd_send_nolock(&gsm->context.iface,
