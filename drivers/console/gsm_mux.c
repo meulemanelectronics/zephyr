@@ -729,15 +729,25 @@ int gsm_mux_disconnect(struct gsm_mux *mux, uint8_t dlci_address, k_timeout_t ti
 
 	dlci = gsm_dlci_get(mux, dlci_address);
 	if (dlci == NULL) {
+		LOG_ERR("gsm_mux_disconnect(): DLCI \"get\" returned NULL for address %u.", dlci_address);
 		return -ENOENT;
 	}
 
-	(void)gsm_mux_send_control_message(dlci->mux, dlci->num,
-					   CMD_CLD, NULL, 0);
+	int err = gsm_mux_send_control_message(dlci->mux, dlci->num,
+					       CMD_CLD, NULL, 0);
+	if (err != 0) {
+		LOG_WRN("gsm_mux_disconnect(): Send control message failed (err: %d).", err);
+	}
 
-	(void)k_work_cancel_delayable(&mux->t2_timer);
+	err = k_work_cancel_delayable(&mux->t2_timer);
+	if (err != 0) {
+		LOG_WRN("gsm_mux_disconnect(): Failed cancelling delayed timer work (err: %d).", err);
+	}
 
-	(void)gsm_dlci_closing(dlci, NULL);
+	err = gsm_dlci_closing(dlci, NULL);
+	if (err != 0) {
+		LOG_WRN("gsm_mux_disconnect(): Failed closing GSM DLCI (err: %d).", err);
+	}
 
 	return k_sem_take(&dlci->disconnect_sem, timeout);
 }
