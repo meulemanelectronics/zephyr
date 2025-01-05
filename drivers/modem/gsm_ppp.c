@@ -90,7 +90,7 @@ static struct gsm_modem {
 		GSM_PPP_WAIT_AT,
 		GSM_PPP_AT_RDY,
 		GSM_PPP_STATE_INIT,
-		GSM_PPP_STATE_CONTROL_CHANNEL = GSM_PPP_STATE_INIT,
+		GSM_PPP_STATE_CONTROL_CHANNEL,
 		GSM_PPP_STATE_PPP_CHANNEL,
 		GSM_PPP_STATE_AT_CHANNEL,
 		GSM_PPP_STATE_DONE,
@@ -1291,14 +1291,26 @@ static void mux_setup(struct k_work *work)
 	gsm_ppp_lock(gsm);
 
 	switch (gsm->state) {
-	case GSM_PPP_STATE_CONTROL_CHANNEL:
-		/* We need to call this to reactivate mux ISR. Note: This is only called
-		 * after re-initing gsm_ppp.
+	case GSM_PPP_STATE_INIT:
+		/* We need to call uart_mux_enable to reactivate mux ISR.
+		 * Note: This is only called after re-initing gsm_ppp.
 		 */
 		if (gsm->ppp_dev != NULL) {
 			uart_mux_enable(gsm->ppp_dev);
 		}
+		if (gsm->at_dev != NULL) {
+			uart_mux_enable(gsm->at_dev);
+		}
+		if (gsm->control_dev != NULL) {
+			uart_mux_enable(gsm->control_dev);
+		}
 
+		gsm->state = GSM_PPP_STATE_CONTROL_CHANNEL;
+		gsm_ppp_unlock(gsm);
+		mux_setup_next(gsm);
+
+		return;
+	case GSM_PPP_STATE_CONTROL_CHANNEL:
 		/* Get UART device. There is one dev / DLCI */
 		if (gsm->control_dev == NULL) {
 			gsm->control_dev = uart_mux_alloc();
@@ -1383,6 +1395,46 @@ fail:
 	gsm->state = GSM_PPP_STATE_ERROR;
 unlock:
 	gsm_ppp_unlock(gsm);
+}
+
+void mux_disable(struct gsm_modem *gsm)
+{
+	int r;
+	if (IS_ENABLED(CONFIG_GSM_MUX)) {
+		if (gsm->at_dev) {
+			int err = uart_mux_disconnect(gsm->at_dev, DLCI_AT, K_FOREVER);
+			if (err != 0) {
+				LOG_WRN("mux_disable(): UART mux disable returned %d for AT device.", err);
+			}
+		}
+		if (gsm->ppp_dev) {
+			int err = uart_mux_disconnect(gsm->ppp_dev, DLCI_PPP, K_FOREVER);
+			if (err != 0) {
+				LOG_WRN("mux_disable(): UART mux disable returned %d for PPP device.", err);
+			}
+		}
+		if (gsm->control_dev) {
+			int err = uart_mux_disconnect(gsm->control_dev, DLCI_CONTROL, K_FOREVER);
+			if (err != 0) {
+				LOG_WRN("mux_disable(): UART mux disable returned %d for CONTROL device.", err);
+			}
+		}
+		if (gsm->at_dev) {
+			uart_mux_disable(gsm->at_dev);
+		}
+		if (gsm->ppp_dev) {
+			uart_mux_disable(gsm->ppp_dev);
+		}
+		if (gsm->control_dev) {
+			uart_mux_disable(gsm->control_dev);
+		}
+		gsm->state = GSM_PPP_STATE_ERROR;
+		r = modem_iface_uart_init_dev(&gsm->context.iface,
+					      DEVICE_DT_GET(GSM_UART_NODE));
+		if (r) {
+			LOG_ERR("modem_iface_uart_init returned %d", r);
+		}
+	}
 }
 
 static void gsm_configure(struct k_work *work)
@@ -1499,12 +1551,8 @@ void gsm_ppp_recover_cmux(const struct device *dev)
 
 	gsm_ppp_cancel(gsm);
 
-	gsm_ppp_lock(gsm);
-
 	if (IS_ENABLED(CONFIG_GSM_MUX)) {
-		if (gsm->ppp_dev != NULL) {
-			uart_mux_disable(gsm->ppp_dev);
-		}
+		mux_disable(gsm);
 	}
 
 	gsm->state = GSM_PPP_STOP;
@@ -1531,15 +1579,13 @@ void gsm_ppp_stop(const struct device *dev, bool keep_AT_channel)
 	}
 
 	if (IS_ENABLED(CONFIG_GSM_MUX)) {
-		if (gsm->ppp_dev != NULL) {
-			uart_mux_disable(gsm->ppp_dev);
-		}
+		mux_disable(gsm);
+	}
 
-		if (!keep_AT_channel) {
-			if (modem_cmd_handler_tx_lock(&gsm->context.cmd_handler,
-									GSM_CMD_LOCK_TIMEOUT) < 0) {
-				LOG_WRN("Failed locking modem cmds!");
-			}
+	if (!keep_AT_channel) {
+		if (modem_cmd_handler_tx_lock(&gsm->context.cmd_handler,
+								GSM_CMD_LOCK_TIMEOUT) < 0) {
+			LOG_WRN("Failed locking modem cmds!");
 		}
 	}
 
