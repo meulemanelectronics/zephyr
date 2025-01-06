@@ -1229,7 +1229,7 @@ static int mux_enable(struct gsm_modem *gsm)
 		/* Arbitrary delay for Quectel modems to initialize the CMUX,
 		 * without this the AT cmd will fail.
 		 */
-		(void)k_sleep(K_MSEC(50));
+		(void)k_sleep(GSM_CMD_AT_TIMEOUT);
 	} else {
 		/* Generic GSM modem */
 		ret = modem_cmd_send_nolock(&gsm->context.iface,
@@ -1402,13 +1402,22 @@ void mux_disable(struct gsm_modem *gsm)
 	int r;
 	if (IS_ENABLED(CONFIG_GSM_MUX)) {
 		if (gsm->at_dev) {
-			(void)uart_mux_disconnect(gsm->at_dev, DLCI_AT, K_FOREVER);
+			int err = uart_mux_disconnect(gsm->at_dev, DLCI_AT, K_FOREVER);
+			if (err != 0) {
+				LOG_WRN("mux_disable(): UART mux disable returned %d for AT device.", err);
+			}
 		}
 		if (gsm->ppp_dev) {
-			(void)uart_mux_disconnect(gsm->ppp_dev, DLCI_PPP, K_FOREVER);
+			int err = uart_mux_disconnect(gsm->ppp_dev, DLCI_PPP, K_FOREVER);
+			if (err != 0) {
+				LOG_WRN("mux_disable(): UART mux disable returned %d for PPP device.", err);
+			}
 		}
 		if (gsm->control_dev) {
-			(void)uart_mux_disconnect(gsm->control_dev, DLCI_CONTROL, K_FOREVER);
+			int err = uart_mux_disconnect(gsm->control_dev, DLCI_CONTROL, K_FOREVER);
+			if (err != 0) {
+				LOG_WRN("mux_disable(): UART mux disable returned %d for CONTROL device.", err);
+			}
 		}
 		if (gsm->at_dev) {
 			uart_mux_disable(gsm->at_dev);
