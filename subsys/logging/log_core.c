@@ -67,6 +67,7 @@ static const log_format_func_t format_table[] = {
 	[LOG_OUTPUT_DICT] = IS_ENABLED(CONFIG_LOG_DICTIONARY_SUPPORT) ?
 						log_dict_output_msg_process : NULL
 };
+static const uint32_t max_flushed_messages = 100u;
 
 log_format_func_t log_format_func_t_get(uint32_t log_type)
 {
@@ -373,8 +374,12 @@ void z_impl_log_panic(void)
 	}
 
 	if (!IS_ENABLED(CONFIG_LOG_MODE_IMMEDIATE)) {
-		/* Flush */
+		/* Flush (a limited amount of messages) */
+		uint32_t flushed_message_count = 0u;
 		while (log_process() == true) {
+			if (++flushed_message_count > max_flushed_messages) {
+				break;
+			}
 		}
 	}
 

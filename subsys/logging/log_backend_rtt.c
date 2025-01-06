@@ -267,6 +267,7 @@ static void log_backend_rtt_init(struct log_backend const *const backend)
 		log_backend_rtt_cfg();
 	}
 
+	panic_mode = false;
 	host_present = true;
 	line_pos = line_buf;
 }
