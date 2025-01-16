@@ -52,7 +52,7 @@ static int runtime_suspend(const struct device *dev, bool async)
 	}
 
 	if (pm->usage == 0U) {
-		LOG_WRN("Unbalanced suspend");
+		LOG_WRN("Unbalanced suspend: device name %s", dev->name);
 		ret = -EALREADY;
 		goto unlock;
 	}
