@@ -968,7 +968,7 @@ static void state_collect(const struct shell *shell)
 #if defined(CONFIG_SHELL_BACKEND_RTT) && defined(CONFIG_SEGGER_RTT_BUFFER_SIZE_DOWN)
 			uint8_t buf[CONFIG_SEGGER_RTT_BUFFER_SIZE_DOWN];
 #else
-			uint8_t buff[16];
+			uint8_t buf[16];
 #endif
 
 			(void)shell->iface->api->read(shell->iface, buf,
