@@ -964,7 +964,12 @@ static void state_collect(const struct shell *shell)
 		shell_bypass_cb_t bypass = shell->ctx->bypass;
 
 		if (bypass) {
+			// Increase the default bypass buffer size of 16 with the DOWN buffer configuration.
+#if defined(CONFIG_SHELL_BACKEND_RTT) && defined(CONFIG_SEGGER_RTT_BUFFER_SIZE_DOWN)
+			uint8_t buf[CONFIG_SEGGER_RTT_BUFFER_SIZE_DOWN];
+#else
 			uint8_t buf[16];
+#endif
 
 			(void)shell->iface->api->read(shell->iface, buf,
 							sizeof(buf), &count);
