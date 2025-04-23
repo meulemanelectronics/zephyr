@@ -656,6 +656,7 @@ static int gsm_mux_send_control_message(struct gsm_mux *mux, uint8_t dlci_addres
 					     gsm_mux_alloc_buf, NULL);
 		if (added != data_len) {
 			net_buf_unref(buf);
+			LOG_ERR("[%p] Cannot allocate data", mux);
 			return -ENOMEM;
 		}
 	}
@@ -663,6 +664,7 @@ static int gsm_mux_send_control_message(struct gsm_mux *mux, uint8_t dlci_addres
 	ctrl = gsm_mux_alloc_control_msg(buf, cmd);
 	if (!ctrl) {
 		net_buf_unref(buf);
+		LOG_ERR("[%p] Cannot allocate control message", mux);
 		return -ENOMEM;
 	}
 
