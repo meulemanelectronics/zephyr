@@ -454,9 +454,32 @@ static int attach(const struct device *mux_uart, const struct device *uart,
 
 int uart_mux_disconnect(const struct device *dev, uint8_t dlci_address, k_timeout_t timeout)
 {
-	struct uart_mux_dev_data *dev_data = dev->data;
+	sys_snode_t *sn, *sns;
 
-	return gsm_mux_disconnect(dev_data->real_uart->mux, dlci_address, timeout);
+	if (dev == NULL) {
+		return -EINVAL;
+	}
+
+	LOG_WRN("Disconnect DLCI %d from %s", dlci_address,
+		dev->name);
+
+	SYS_SLIST_FOR_EACH_NODE_SAFE(&uart_mux_data_devlist, sn, sns) {
+		struct uart_mux_dev_data *dev_data =
+			CONTAINER_OF(sn, struct uart_mux_dev_data, node);
+
+		if (dev_data->dev == dev) {
+			int ret = gsm_mux_disconnect(dev_data->real_uart->mux, dlci_address, timeout);
+			if (ret < 0) {
+				LOG_WRN("Cannot disconnect DLCI %d (%d)",
+					dlci_address, ret);
+				return ret;
+			}
+
+			return 0;
+		}
+	}
+
+	return -ENOENT;
 }
 
 static int uart_mux_poll_in(const struct device *dev, unsigned char *p_char)
