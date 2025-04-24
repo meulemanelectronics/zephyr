@@ -409,7 +409,7 @@ static int attach(const struct device *mux_uart, const struct device *uart,
 		return -EINVAL;
 	}
 
-	LOG_DBG("Attach DLCI %d (%s) to %s", dlci_address,
+	LOG_WRN("Attach DLCI %d (%s) to %s", dlci_address,
 		mux_uart->name, uart->name);
 
 	SYS_SLIST_FOR_EACH_NODE_SAFE(&uart_mux_data_devlist, sn, sns) {
@@ -440,7 +440,7 @@ static int attach(const struct device *mux_uart, const struct device *uart,
 					      dev_data,
 					      &dev_data->dlci);
 			if (ret < 0) {
-				LOG_DBG("Cannot create DLCI %d (%d)",
+				LOG_WRN("Cannot create DLCI %d (%d)",
 					dlci_address, ret);
 				return ret;
 			}

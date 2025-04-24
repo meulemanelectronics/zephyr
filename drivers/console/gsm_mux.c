@@ -505,7 +505,7 @@ static void gsm_dlci_close(struct gsm_dlci *dlci)
 /* Return true if we need to retry, false otherwise */
 static bool handle_t1_timeout(struct gsm_dlci *dlci)
 {
-	LOG_DBG("[%p/%d] T1 timeout", dlci, dlci->num);
+	LOG_WRN("[%p/%d] T1 timeout", dlci, dlci->num);
 
 	if (dlci->state == GSM_DLCI_OPENING) {
 		dlci->retries--;
