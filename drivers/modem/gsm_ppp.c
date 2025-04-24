@@ -1295,14 +1295,14 @@ static void mux_setup(struct k_work *work)
 		/* We need to call uart_mux_enable to reactivate mux ISR.
 		 * Note: This is only called after re-initing gsm_ppp.
 		 */
+		if (gsm->control_dev != NULL) {
+			uart_mux_enable(gsm->control_dev);
+		}
 		if (gsm->ppp_dev != NULL) {
 			uart_mux_enable(gsm->ppp_dev);
 		}
 		if (gsm->at_dev != NULL) {
 			uart_mux_enable(gsm->at_dev);
-		}
-		if (gsm->control_dev != NULL) {
-			uart_mux_enable(gsm->control_dev);
 		}
 
 		gsm->state = GSM_PPP_STATE_CONTROL_CHANNEL;
