@@ -1291,7 +1291,7 @@ static void mux_setup(struct k_work *work)
 	gsm_ppp_lock(gsm);
 
 	switch (gsm->state) {
-	case GSM_PPP_STATE_INIT:
+		case GSM_PPP_STATE_INIT:
 		/* We need to call uart_mux_enable to reactivate mux ISR.
 		 * Note: This is only called after re-initing gsm_ppp.
 		 */
@@ -1535,11 +1535,13 @@ unlock:
 
 void gsm_ppp_cancel(struct gsm_modem *gsm)
 {
+	struct k_work_sync work_sync;
+
 	gsm_ppp_lock(gsm);
 
-	(void)k_work_cancel_delayable(&gsm->gsm_configure_work);
+	(void)k_work_cancel_delayable_sync(&gsm->gsm_configure_work, &work_sync);
 	if (IS_ENABLED(CONFIG_GSM_MUX)) {
-		(void)k_work_cancel_delayable(&gsm->rssi_work_handle);
+		(void)k_work_cancel_delayable_sync(&gsm->rssi_work_handle, &work_sync);
 	}
 
 	gsm_ppp_unlock(gsm);
@@ -1579,7 +1581,9 @@ void gsm_ppp_stop(const struct device *dev, bool keep_AT_channel)
 	}
 
 	if (IS_ENABLED(CONFIG_GSM_MUX)) {
-		mux_disable(gsm);
+		if (gsm->ppp_dev != NULL) {
+			mux_disable(gsm);
+		}
 	}
 
 	if (!keep_AT_channel) {

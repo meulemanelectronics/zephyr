@@ -505,7 +505,7 @@ static void gsm_dlci_close(struct gsm_dlci *dlci)
 /* Return true if we need to retry, false otherwise */
 static bool handle_t1_timeout(struct gsm_dlci *dlci)
 {
-	LOG_DBG("[%p/%d] T1 timeout", dlci, dlci->num);
+	LOG_WRN("[%p/%d] T1 timeout", dlci, dlci->num);
 
 	if (dlci->state == GSM_DLCI_OPENING) {
 		dlci->retries--;
@@ -656,6 +656,7 @@ static int gsm_mux_send_control_message(struct gsm_mux *mux, uint8_t dlci_addres
 					     gsm_mux_alloc_buf, NULL);
 		if (added != data_len) {
 			net_buf_unref(buf);
+			LOG_ERR("[%p] Cannot allocate data", mux);
 			return -ENOMEM;
 		}
 	}
@@ -663,6 +664,7 @@ static int gsm_mux_send_control_message(struct gsm_mux *mux, uint8_t dlci_addres
 	ctrl = gsm_mux_alloc_control_msg(buf, cmd);
 	if (!ctrl) {
 		net_buf_unref(buf);
+		LOG_ERR("[%p] Cannot allocate control message", mux);
 		return -ENOMEM;
 	}
 
