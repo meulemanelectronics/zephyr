@@ -1500,7 +1500,14 @@ void gsm_ppp_start(const struct device *dev)
 	gsm_ppp_lock(gsm);
 
 	if (gsm->state != GSM_PPP_STOP) {
-		LOG_ERR("gsm_ppp is already %s", "started");
+		LOG_WRN("gsm_ppp is already %s", "started");
+
+		if (IS_ENABLED(CONFIG_GSM_MUX)) {
+			if (gsm->ppp_dev != NULL) {
+				uart_mux_enable(gsm->ppp_dev);
+			}
+		}
+
 		goto unlock;
 	}
 
@@ -1585,7 +1592,7 @@ void gsm_ppp_stop(const struct device *dev, bool keep_AT_channel)
 		gsm->modem_off_cb(gsm->dev, gsm->user_data);
 	}
 
-	gsm->state = GSM_PPP_STOP;
+	// gsm->state = GSM_PPP_STOP;
 	gsm->net_state = GSM_NET_INIT;
 	gsm_ppp_unlock(gsm);
 }
